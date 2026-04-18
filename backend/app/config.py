@@ -10,6 +10,8 @@ class Settings(BaseSettings):
 
     app_name: str = "Saju MVP API"
     llm_provider: Literal["ollama", "groq"] = "ollama"
+    prompts_db_path: str = "./prompts.sqlite3"
+    admin_api_key: str | None = None
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen3:4b"

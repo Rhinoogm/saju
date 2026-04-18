@@ -14,9 +14,10 @@ interface InitialFormProps {
   loading: boolean;
   onChange: (profile: InitialProfile) => void;
   onSubmit: () => void;
+  onSajuOnly: () => void;
 }
 
-export function InitialForm({ profile, loading, onChange, onSubmit }: InitialFormProps) {
+export function InitialForm({ profile, loading, onChange, onSubmit, onSajuOnly }: InitialFormProps) {
   const currentYear = new Date().getFullYear();
   const years = useMemo(() => {
     const end = Math.min(2100, currentYear);
@@ -174,18 +175,27 @@ export function InitialForm({ profile, loading, onChange, onSubmit }: InitialFor
           value={profile.initial_concern}
           onChange={(event) => update("initial_concern", event.target.value)}
           placeholder="이직을 해야 할지 버텨야 할지 모르겠어요. 지금 회사에 있으면 안정적이지만 계속 답답합니다."
-          required
         />
       </label>
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="flex h-[54px] w-full items-center justify-center gap-2 rounded-lg bg-coral px-5 text-base font-black text-white shadow-soft transition hover:bg-berry disabled:cursor-not-allowed disabled:opacity-70"
-      >
-        {loading ? <LoaderCircle className="animate-spin" size={20} aria-hidden /> : <Send size={19} aria-hidden />}
-        {loading ? "질문 생성 중" : "진단 질문 생성"}
-      </button>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={onSajuOnly}
+          disabled={loading}
+          className="flex h-[54px] w-full items-center justify-center gap-2 rounded-lg border border-stone-200 bg-white px-5 text-base font-black text-stone-700 shadow-soft transition hover:bg-cloud disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          사주만 보기
+        </button>
+        <button
+          type="submit"
+          disabled={loading}
+          className="flex h-[54px] w-full items-center justify-center gap-2 rounded-lg bg-coral px-5 text-base font-black text-white shadow-soft transition hover:bg-berry disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {loading ? <LoaderCircle className="animate-spin" size={20} aria-hidden /> : <Send size={19} aria-hidden />}
+          {loading ? "질문 생성 중" : "진단 질문 생성"}
+        </button>
+      </div>
     </form>
   );
 }

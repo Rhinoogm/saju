@@ -3,6 +3,7 @@
 import { ArrowLeft, RefreshCcw, Sparkles } from "lucide-react";
 
 import type { FinalReadingResponse, PillarDetail } from "@/lib/api";
+import { SajuPillarsTable } from "@/components/SajuPillarsTable";
 
 const pillarLabels: Record<string, string> = {
   year: "연주",
@@ -56,11 +57,14 @@ export function ReadingResult({ result, onBack, onRestart }: ReadingResultProps)
   const { reading, saju, meta } = result;
 
   return (
-    <article className="space-y-4 rounded-lg border border-stone-200 bg-white p-4 shadow-soft sm:p-6">
+    <article className="space-y-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-soft sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-sm font-black text-mint">3단계</p>
           <h2 className="mt-1 text-2xl font-black text-ink">최종 사주풀이</h2>
+          <p className="mt-2 text-sm leading-6 text-stone-500">
+            {saju.solar_date} · {saju.birth_time}
+          </p>
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={onBack} className="flex h-10 items-center justify-center gap-2 rounded-lg border border-stone-200 px-3 text-sm font-bold text-stone-600 hover:bg-cloud">
@@ -91,14 +95,7 @@ export function ReadingResult({ result, onBack, onRestart }: ReadingResultProps)
         <ListBlock title="답변에서 읽은 신호" items={reading.answer_signals} />
         <ListBlock title="사주 근거" items={reading.saju_basis} />
         <ListBlock title="실행 기준" items={reading.action_steps} />
-        <section className="rounded-lg border border-stone-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-black text-stone-700">명식 요약</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {Object.entries(saju.pillars).map(([name, detail]) => (
-              <PillarTile key={name} name={name} detail={detail} />
-            ))}
-          </div>
-        </section>
+        <SajuPillarsTable saju={saju} />
       </div>
 
       <section className="rounded-lg border border-stone-200 bg-cloud p-4 text-sm font-bold leading-6 text-stone-700">

@@ -133,6 +133,30 @@ def test_generate_questions_happy_path() -> None:
     assert body["meta"]["provider"] == "mock"
 
 
+def test_saju_only_happy_path() -> None:
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/saju-only",
+        json={
+            "name": "홍길동",
+            "gender": "male",
+            "birth": {
+                "calendar_type": "solar",
+                "year": 1990,
+                "month": 10,
+                "day": 10,
+                "hour": 14,
+                "minute": 30,
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["saju"]["pillars"]["year"]["pillar"]
+
+
 def test_final_reading_happy_path() -> None:
     app.dependency_overrides[get_llm_provider] = lambda: MockProvider()
     client = TestClient(app)

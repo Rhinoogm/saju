@@ -185,3 +185,18 @@ class FinalReadingResponse(BaseModel):
     saju: SajuData
     reading: FinalReadingOutput
     meta: ResponseMeta
+
+
+class SajuOnlyRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=40)
+    gender: Gender = Gender.other
+    birth: BirthInfo
+
+    @field_validator("name")
+    @classmethod
+    def strip_text(cls, value: str) -> str:
+        return value.strip()
+
+
+class SajuOnlyResponse(BaseModel):
+    saju: SajuData

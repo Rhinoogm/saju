@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import ValidationError
 
 from app.config import Settings, get_settings
@@ -14,18 +14,25 @@ from app.schemas.saju import (
     GenerateQuestionsResponse,
     QuestionGenerationOutput,
     ResponseMeta,
+    SajuOnlyRequest,
+    SajuOnlyResponse,
 )
 from app.services.calendar_service import CalendarCalculationError, CalendarService
 from app.services.llm.base import LLMProvider, LLMProviderError, LLMResponse, LLMTimeoutError
 from app.services.llm.groq_provider import GroqProvider
 from app.services.llm.ollama_provider import OllamaProvider
 from app.services.prompt_builder import build_final_reading_prompt, build_question_generation_prompt
+from app.services.prompt_store import PromptStore
 
 router = APIRouter(prefix="/api", tags=["saju"])
 
 
 def get_calendar_service() -> CalendarService:
     return CalendarService()
+
+
+def get_prompt_store(request: Request) -> PromptStore | None:
+    return getattr(request.app.state, "prompt_store", None)
 
 
 def get_llm_provider(settings: Settings = Depends(get_settings)) -> LLMProvider:
@@ -94,13 +101,14 @@ async def generate_questions(
     payload: GenerateQuestionsRequest,
     calendar_service: CalendarService = Depends(get_calendar_service),
     llm_provider: LLMProvider = Depends(get_llm_provider),
+    prompt_store: PromptStore | None = Depends(get_prompt_store),
 ) -> GenerateQuestionsResponse:
     try:
         saju = calendar_service.calculate(payload)
     except CalendarCalculationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
-    built_prompt = build_question_generation_prompt(payload, saju)
+    built_prompt = build_question_generation_prompt(payload, saju, prompt_store=prompt_store)
     llm_response = await _call_llm(
         llm_provider,
         system=built_prompt.system,
@@ -122,13 +130,14 @@ async def final_reading(
     payload: FinalReadingRequest,
     calendar_service: CalendarService = Depends(get_calendar_service),
     llm_provider: LLMProvider = Depends(get_llm_provider),
+    prompt_store: PromptStore | None = Depends(get_prompt_store),
 ) -> FinalReadingResponse:
     try:
         saju = calendar_service.calculate(payload)
     except CalendarCalculationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
-    built_prompt = build_final_reading_prompt(payload, saju)
+    built_prompt = build_final_reading_prompt(payload, saju, prompt_store=prompt_store)
     llm_response = await _call_llm(
         llm_provider,
         system=built_prompt.system,
@@ -143,3 +152,16 @@ async def final_reading(
         reading=output,
         meta=_meta(llm_response),
     )
+
+
+@router.post("/saju-only", response_model=SajuOnlyResponse)
+async def saju_only(
+    payload: SajuOnlyRequest,
+    calendar_service: CalendarService = Depends(get_calendar_service),
+) -> SajuOnlyResponse:
+    try:
+        saju = calendar_service.calculate(payload)
+    except CalendarCalculationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+    return SajuOnlyResponse(saju=saju)

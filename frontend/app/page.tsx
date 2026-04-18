@@ -5,6 +5,7 @@ import { useState } from "react";
 import { InitialForm } from "@/components/InitialForm";
 import { QuestionsForm } from "@/components/QuestionsForm";
 import { ReadingResult } from "@/components/ReadingResult";
+import { SajuOnlyResult } from "@/components/SajuOnlyResult";
 import {
   DiagnosticQuestion,
   FinalReadingResponse,
@@ -13,9 +14,10 @@ import {
   QuestionAnswer,
   generateQuestions,
   requestFinalReading,
+  requestSajuOnly,
 } from "@/lib/api";
 
-type Step = "initial" | "questions" | "result";
+type Step = "initial" | "questions" | "result" | "saju";
 
 const defaultProfile: InitialProfile = {
   name: "",
@@ -50,13 +52,19 @@ export default function Home() {
   const [questionResult, setQuestionResult] = useState<GenerateQuestionsResponse | null>(null);
   const [answers, setAnswers] = useState<QuestionAnswer[]>([]);
   const [finalResult, setFinalResult] = useState<FinalReadingResponse | null>(null);
+  const [sajuOnlyResult, setSajuOnlyResult] = useState<import("@/lib/api").SajuOnlyResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleGenerateQuestions() {
+    if (profile.initial_concern.trim().length === 0) {
+      setError("초기 고민을 적어주세요. (사주만 보려면 ‘사주만 보기’를 눌러도 돼요.)");
+      return;
+    }
     setLoading(true);
     setError("");
     setFinalResult(null);
+    setSajuOnlyResult(null);
 
     try {
       const response = await generateQuestions(profile);
@@ -65,6 +73,28 @@ export default function Home() {
       setStep("questions");
     } catch (error) {
       setError(error instanceof Error ? error.message : "질문 생성 중 오류가 발생했어요.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSajuOnly() {
+    setLoading(true);
+    setError("");
+    setFinalResult(null);
+    setQuestionResult(null);
+    setAnswers([]);
+
+    try {
+      const response = await requestSajuOnly({
+        name: profile.name,
+        gender: profile.gender,
+        birth: profile.birth,
+      });
+      setSajuOnlyResult(response);
+      setStep("saju");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "사주 계산 중 오류가 발생했어요.");
     } finally {
       setLoading(false);
     }
@@ -90,6 +120,7 @@ export default function Home() {
     setQuestionResult(null);
     setAnswers([]);
     setFinalResult(null);
+    setSajuOnlyResult(null);
     setError("");
   }
 
@@ -118,7 +149,7 @@ export default function Home() {
         {error && <div className="mb-4 rounded-lg border border-coral/20 bg-coral/10 px-4 py-3 text-sm font-bold leading-6 text-coral">{error}</div>}
 
         {step === "initial" && (
-          <InitialForm profile={profile} loading={loading} onChange={setProfile} onSubmit={handleGenerateQuestions} />
+          <InitialForm profile={profile} loading={loading} onChange={setProfile} onSubmit={handleGenerateQuestions} onSajuOnly={handleSajuOnly} />
         )}
 
         {step === "questions" && questionResult && (
@@ -134,6 +165,10 @@ export default function Home() {
 
         {step === "result" && finalResult && (
           <ReadingResult result={finalResult} onBack={() => setStep("questions")} onRestart={restart} />
+        )}
+
+        {step === "saju" && sajuOnlyResult && (
+          <SajuOnlyResult saju={sajuOnlyResult.saju} onBack={() => setStep("initial")} onRestart={restart} />
         )}
       </div>
     </main>

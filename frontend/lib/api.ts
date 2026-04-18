@@ -108,6 +108,16 @@ export interface FinalReadingResponse {
   meta: ResponseMeta;
 }
 
+export interface SajuOnlyRequest {
+  name: string;
+  gender: Gender;
+  birth: BirthInfo;
+}
+
+export interface SajuOnlyResponse {
+  saju: SajuData;
+}
+
 function apiBaseUrl() {
   return (
     process.env.NEXT_PUBLIC_API_BASE_URL ??
@@ -148,4 +158,8 @@ export function generateQuestions(payload: InitialProfile): Promise<GenerateQues
 
 export function requestFinalReading(payload: InitialProfile & { answers: QuestionAnswer[] }): Promise<FinalReadingResponse> {
   return postJson<FinalReadingResponse>("/api/final-reading", payload);
+}
+
+export function requestSajuOnly(payload: SajuOnlyRequest): Promise<SajuOnlyResponse> {
+  return postJson<SajuOnlyResponse>("/api/saju-only", payload);
 }

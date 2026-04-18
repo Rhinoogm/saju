@@ -19,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body className="min-h-screen bg-cloud text-ink antialiased">{children}</body>
     </html>
   );
 }

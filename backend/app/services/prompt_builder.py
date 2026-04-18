@@ -10,6 +10,7 @@ from app.schemas.saju import (
     QuestionGenerationOutput,
     SajuData,
 )
+from app.services.prompt_store import PromptStore
 
 
 QUESTION_SYSTEM_PROMPT = """너는 심리 분석가 겸 한국 명리학 상담가다.
@@ -51,6 +52,16 @@ class BuiltPrompt:
     schema_name: str
 
 
+def _resolve_system_prompt(store: PromptStore | None, name: str, default: str) -> str:
+    if store is None:
+        return default
+    record = store.get_prompt(name)
+    if record is None:
+        return default
+    content = record.content.strip()
+    return content if content else default
+
+
 def _compact_saju_payload(saju: SajuData) -> dict:
     return saju.model_dump(
         mode="json",
@@ -69,7 +80,7 @@ def _profile_payload(profile: GenerateQuestionsRequest | FinalReadingRequest) ->
     }
 
 
-def build_question_generation_prompt(profile: GenerateQuestionsRequest, saju: SajuData) -> BuiltPrompt:
+def build_question_generation_prompt(profile: GenerateQuestionsRequest, saju: SajuData, *, prompt_store: PromptStore | None = None) -> BuiltPrompt:
     schema = QuestionGenerationOutput.model_json_schema()
     prompt = f"""아래 입력을 보고, 사용자가 진짜 원하는 결론을 판별하기 위한 진단 질문 5개를 생성하라.
 
@@ -86,14 +97,14 @@ def build_question_generation_prompt(profile: GenerateQuestionsRequest, saju: Sa
 - 사용자가 선택지를 고르기만 해도 마음의 방향이 드러나야 한다.
 """
     return BuiltPrompt(
-        system=QUESTION_SYSTEM_PROMPT,
+        system=_resolve_system_prompt(prompt_store, "question_system_prompt", QUESTION_SYSTEM_PROMPT),
         prompt=prompt,
         schema=schema,
         schema_name="QuestionGenerationOutput",
     )
 
 
-def build_final_reading_prompt(payload: FinalReadingRequest, saju: SajuData) -> BuiltPrompt:
+def build_final_reading_prompt(payload: FinalReadingRequest, saju: SajuData, *, prompt_store: PromptStore | None = None) -> BuiltPrompt:
     schema = FinalReadingOutput.model_json_schema()
     answers_payload = [answer.model_dump(mode="json") for answer in payload.answers]
     prompt = f"""아래 입력을 분석해 최종 사주풀이를 작성하라.
@@ -117,7 +128,7 @@ def build_final_reading_prompt(payload: FinalReadingRequest, saju: SajuData) -> 
 - caution: 과장된 예언이 아니라 참고용 조언이라는 안전 문장을 적되, 흐름을 깨지 않게 짧게 작성한다.
 """
     return BuiltPrompt(
-        system=FINAL_SYSTEM_PROMPT,
+        system=_resolve_system_prompt(prompt_store, "final_system_prompt", FINAL_SYSTEM_PROMPT),
         prompt=prompt,
         schema=schema,
         schema_name="FinalReadingOutput",
