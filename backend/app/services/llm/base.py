@@ -12,6 +12,10 @@ class LLMTimeoutError(LLMProviderError):
     pass
 
 
+class LLMRateLimitError(LLMProviderError):
+    pass
+
+
 @dataclass(frozen=True)
 class LLMResponse:
     content: str

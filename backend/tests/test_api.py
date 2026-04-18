@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from app.api.routes.saju import get_llm_provider
 from app.main import app
 from app.services.llm.base import LLMResponse
+from app.services.rate_limiter import InMemoryRateLimiter
 
 
 QUESTION_PAYLOAD = {
@@ -146,6 +147,32 @@ def test_generate_questions_happy_path() -> None:
     assert body["questions"][0]["id"] == "q1"
     assert body["saju"]["pillars"]["year"]["pillar"]
     assert body["meta"]["provider"] == "mock"
+
+
+def test_generate_questions_rate_limit() -> None:
+    original_limiter = app.state.llm_rate_limiter
+    app.state.llm_rate_limiter = InMemoryRateLimiter(per_ip_per_hour=1, global_per_minute=100)
+    app.dependency_overrides[get_llm_provider] = lambda: MockProvider()
+    client = TestClient(app)
+
+    try:
+        first_response = client.post("/api/generate-questions", json=initial_payload())
+        second_response = client.post("/api/generate-questions", json=initial_payload())
+    finally:
+        app.dependency_overrides.clear()
+        app.state.llm_rate_limiter = original_limiter
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert "요청 한도" in second_response.json()["detail"]
+
+
+def test_admin_prompts_router_disabled_by_default() -> None:
+    client = TestClient(app)
+
+    response = client.get("/api/admin/prompts")
+
+    assert response.status_code == 404
 
 
 def test_saju_only_happy_path() -> None:

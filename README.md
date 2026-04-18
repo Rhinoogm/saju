@@ -128,3 +128,7 @@ npm run dev
 cd backend
 pytest
 ```
+
+## 무료 배포
+
+무료 공개 데모 배포는 Vercel 프론트엔드, Render FastAPI 백엔드, Groq Free API 구성을 권장합니다. 상세 절차와 환경변수는 [DEPLOYMENT.md](DEPLOYMENT.md)를 참고하세요.

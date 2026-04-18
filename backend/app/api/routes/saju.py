@@ -18,11 +18,12 @@ from app.schemas.saju import (
     SajuOnlyResponse,
 )
 from app.services.calendar_service import CalendarCalculationError, CalendarService
-from app.services.llm.base import LLMProvider, LLMProviderError, LLMResponse, LLMTimeoutError
+from app.services.llm.base import LLMProvider, LLMProviderError, LLMRateLimitError, LLMResponse, LLMTimeoutError
 from app.services.llm.groq_provider import GroqProvider
 from app.services.llm.ollama_provider import OllamaProvider
 from app.services.prompt_builder import build_final_reading_prompt, build_question_generation_prompt
 from app.services.prompt_store import PromptStore
+from app.services.rate_limiter import enforce_llm_rate_limit
 
 router = APIRouter(prefix="/api", tags=["saju"])
 
@@ -74,6 +75,11 @@ async def _call_llm(llm_provider: LLMProvider, *, system: str, prompt: str, sche
         )
     except LLMTimeoutError as exc:
         raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=str(exc)) from exc
+    except LLMRateLimitError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="무료 모델 사용 한도에 도달했어요. 잠시 뒤 다시 시도해주세요.",
+        ) from exc
     except LLMProviderError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
@@ -98,7 +104,11 @@ def _parse_final_reading(content: str) -> FinalReadingOutput:
         ) from exc
 
 
-@router.post("/generate-questions", response_model=GenerateQuestionsResponse)
+@router.post(
+    "/generate-questions",
+    response_model=GenerateQuestionsResponse,
+    dependencies=[Depends(enforce_llm_rate_limit)],
+)
 async def generate_questions(
     payload: GenerateQuestionsRequest,
     calendar_service: CalendarService = Depends(get_calendar_service),
@@ -127,7 +137,11 @@ async def generate_questions(
     )
 
 
-@router.post("/final-reading", response_model=FinalReadingResponse)
+@router.post(
+    "/final-reading",
+    response_model=FinalReadingResponse,
+    dependencies=[Depends(enforce_llm_rate_limit)],
+)
 async def final_reading(
     payload: FinalReadingRequest,
     calendar_service: CalendarService = Depends(get_calendar_service),

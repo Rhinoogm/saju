@@ -5,15 +5,25 @@ from app.api.routes.admin_prompts import router as admin_prompts_router
 from app.api.routes.saju import router as saju_router
 from app.config import get_settings
 from app.services.prompt_store import PromptStore
+from app.services.rate_limiter import InMemoryRateLimiter
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name, version="0.1.0")
 
-    store = PromptStore(settings.prompts_db_path)
-    store.init()
-    app.state.prompt_store = store
+    app.state.prompt_store = None
+    if settings.enable_admin_prompts:
+        store = PromptStore(settings.prompts_db_path)
+        store.init()
+        app.state.prompt_store = store
+
+    app.state.llm_rate_limiter = None
+    if settings.rate_limit_enabled:
+        app.state.llm_rate_limiter = InMemoryRateLimiter(
+            per_ip_per_hour=settings.llm_rate_limit_per_ip_per_hour,
+            global_per_minute=settings.llm_rate_limit_global_per_minute,
+        )
 
     app.add_middleware(
         CORSMiddleware,
@@ -28,7 +38,8 @@ def create_app() -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    app.include_router(admin_prompts_router)
+    if settings.enable_admin_prompts:
+        app.include_router(admin_prompts_router)
     app.include_router(saju_router)
     return app
 

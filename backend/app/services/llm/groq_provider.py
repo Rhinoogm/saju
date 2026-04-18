@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 import httpx
 
-from app.services.llm.base import LLMProviderError, LLMResponse, LLMTimeoutError
+from app.services.llm.base import LLMProviderError, LLMRateLimitError, LLMResponse, LLMTimeoutError
 
 _ERROR_BODY_LIMIT = 500
 _JSON_SCHEMA_RESPONSE_FORMAT = "json_schema"
@@ -159,6 +159,8 @@ class GroqProvider:
                 raise LLMTimeoutError("Groq request timed out") from exc
             except httpx.HTTPStatusError as exc:
                 error_text = exc.response.text[:_ERROR_BODY_LIMIT]
+                if exc.response.status_code == 429:
+                    raise LLMRateLimitError("Groq free API limit reached. Please try again later.") from exc
                 if (
                     self.response_format_mode == "auto"
                     and not attempted_json_object_fallback

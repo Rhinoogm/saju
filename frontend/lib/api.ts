@@ -134,6 +134,16 @@ export interface SajuOnlyResponse {
   saju: SajuData;
 }
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 function apiBaseUrl() {
   return (
     process.env.NEXT_PUBLIC_API_BASE_URL ??
@@ -151,7 +161,10 @@ async function postJson<TResponse>(path: string, payload: unknown): Promise<TRes
   });
 
   if (!response.ok) {
-    let message = `요청이 실패했어요. (${response.status})`;
+    let message =
+      response.status === 429
+        ? "무료 공개 데모의 요청 한도에 도달했어요. 잠시 뒤 다시 시도해주세요."
+        : `요청이 실패했어요. (${response.status})`;
     try {
       const body = await response.json();
       if (typeof body.detail === "string") {
@@ -162,7 +175,7 @@ async function postJson<TResponse>(path: string, payload: unknown): Promise<TRes
     } catch {
       // Keep the generic message.
     }
-    throw new Error(message);
+    throw new ApiError(message, response.status);
   }
 
   return response.json();

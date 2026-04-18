@@ -152,7 +152,7 @@ export function QuestionsForm({ questions, answers, loading, onBack, onAnswerCha
         className="mt-5 flex h-[54px] w-full items-center justify-center gap-2 rounded-lg bg-coral px-5 text-base font-black text-white shadow-soft transition hover:bg-berry disabled:cursor-not-allowed disabled:opacity-60"
       >
         {loading ? <LoaderCircle className="animate-spin" size={20} aria-hidden /> : <Send size={19} aria-hidden />}
-        {loading ? "최종 풀이 생성 중" : "최종 풀이 보기"}
+        {loading ? "무료 모델 응답 대기 중" : "최종 풀이 보기"}
       </button>
     </form>
   );

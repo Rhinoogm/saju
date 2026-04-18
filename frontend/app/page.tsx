@@ -7,6 +7,7 @@ import { QuestionsForm } from "@/components/QuestionsForm";
 import { ReadingResult } from "@/components/ReadingResult";
 import { SajuOnlyResult } from "@/components/SajuOnlyResult";
 import {
+  ApiError,
   DiagnosticQuestion,
   FinalReadingResponse,
   GenerateQuestionsResponse,
@@ -36,6 +37,19 @@ const defaultProfile: InitialProfile = {
     use_solar_time: false,
   },
 };
+
+function requestErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof ApiError) {
+    return error.message;
+  }
+  if (error instanceof TypeError) {
+    return "백엔드 서버에 연결하지 못했어요. 잠시 뒤 다시 시도해주세요.";
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return fallback;
+}
 
 function emptyAnswers(questions: DiagnosticQuestion[]): QuestionAnswer[] {
   return questions.map((question) => ({
@@ -72,7 +86,7 @@ export default function Home() {
       setAnswers(emptyAnswers(response.questions));
       setStep("questions");
     } catch (error) {
-      setError(error instanceof Error ? error.message : "질문 생성 중 오류가 발생했어요.");
+      setError(requestErrorMessage(error, "질문 생성 중 오류가 발생했어요."));
     } finally {
       setLoading(false);
     }
@@ -94,7 +108,7 @@ export default function Home() {
       setSajuOnlyResult(response);
       setStep("saju");
     } catch (error) {
-      setError(error instanceof Error ? error.message : "사주 계산 중 오류가 발생했어요.");
+      setError(requestErrorMessage(error, "사주 계산 중 오류가 발생했어요."));
     } finally {
       setLoading(false);
     }
@@ -109,7 +123,7 @@ export default function Home() {
       setFinalResult(response);
       setStep("result");
     } catch (error) {
-      setError(error instanceof Error ? error.message : "최종 풀이 생성 중 오류가 발생했어요.");
+      setError(requestErrorMessage(error, "최종 풀이 생성 중 오류가 발생했어요."));
     } finally {
       setLoading(false);
     }
@@ -147,6 +161,11 @@ export default function Home() {
         </div>
 
         {error && <div className="mb-4 rounded-lg border border-coral/20 bg-white px-4 py-3 text-sm font-bold leading-6 text-coral shadow-soft">{error}</div>}
+        {loading && (
+          <div className="mb-4 rounded-lg border border-mint/20 bg-white px-4 py-3 text-sm font-bold leading-6 text-mint shadow-soft">
+            요청 처리 중입니다. 무료 서버를 깨우는 중이면 1분 정도 걸릴 수 있어요.
+          </div>
+        )}
 
         {step === "initial" && (
           <InitialForm profile={profile} loading={loading} onChange={setProfile} onSubmit={handleGenerateQuestions} onSajuOnly={handleSajuOnly} />

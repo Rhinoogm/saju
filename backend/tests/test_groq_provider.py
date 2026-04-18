@@ -3,6 +3,7 @@ import json
 import httpx
 import pytest
 
+from app.services.llm.base import LLMRateLimitError
 from app.services.llm.groq_provider import GroqProvider
 
 
@@ -110,3 +111,32 @@ async def test_groq_auto_retries_json_schema_400_with_json_object() -> None:
     assert requests[1]["response_format"] == {"type": "json_object"}
     assert "JSON Schema:" in requests[1]["messages"][1]["content"]
     assert response.model == "fallback-model"
+
+
+@pytest.mark.asyncio
+async def test_groq_raises_rate_limit_error_for_429() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            429,
+            json={
+                "error": {
+                    "message": "rate limit exceeded",
+                    "type": "rate_limit_error",
+                }
+            },
+        )
+
+    provider = GroqProvider(
+        api_key="test-key",
+        base_url="http://groq.test/openai/v1",
+        model="openai/gpt-oss-20b",
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(LLMRateLimitError):
+        await provider.generate(
+            system="system",
+            prompt="prompt",
+            schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+            schema_name="TestOutput",
+        )
