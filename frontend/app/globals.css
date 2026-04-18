@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --background: #f2f5f8;
+  --background: #fff9f0;
   --foreground: #24211f;
 }
 
@@ -19,10 +19,8 @@ body {
   min-height: 100%;
   margin: 0;
   color: var(--foreground);
-  background: radial-gradient(1200px 600px at 10% -10%, rgba(241, 190, 77, 0.20), transparent 55%),
-    radial-gradient(900px 500px at 100% 10%, rgba(125, 63, 95, 0.12), transparent 60%),
-    radial-gradient(900px 600px at 50% 120%, rgba(47, 157, 140, 0.10), transparent 55%),
-    var(--background);
+  background: linear-gradient(180deg, #fff9f0 0%, #f7fcf8 48%, #f3f6fb 100%);
+  background-attachment: fixed;
 }
 
 button,

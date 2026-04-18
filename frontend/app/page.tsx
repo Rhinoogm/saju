@@ -139,14 +139,14 @@ export default function Home() {
             return (
               <div
                 key={key}
-                className={`h-2 rounded-full transition ${active || completed || resultCompleted ? "bg-coral" : "bg-stone-200"}`}
+                className={`h-2 rounded-full transition ${active || completed || resultCompleted ? "bg-honey" : "bg-white/80"}`}
                 aria-label={`${label} 단계`}
               />
             );
           })}
         </div>
 
-        {error && <div className="mb-4 rounded-lg border border-coral/20 bg-coral/10 px-4 py-3 text-sm font-bold leading-6 text-coral">{error}</div>}
+        {error && <div className="mb-4 rounded-lg border border-coral/20 bg-white px-4 py-3 text-sm font-bold leading-6 text-coral shadow-soft">{error}</div>}
 
         {step === "initial" && (
           <InitialForm profile={profile} loading={loading} onChange={setProfile} onSubmit={handleGenerateQuestions} onSajuOnly={handleSajuOnly} />
