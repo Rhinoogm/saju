@@ -105,7 +105,7 @@ class DiagnosticQuestion(BaseModel):
     options: list[QuestionOption] = Field(..., max_length=4)
     intent_signal: str = Field(
         ...,
-        min_length=2,
+        min_length=1,
         max_length=80,
         description="이 질문이 확인하려는 숨은 욕구. 예: 돈, 인정, 안전, 도피, 관계 정리",
     )

@@ -199,6 +199,15 @@ def test_saju_only_happy_path() -> None:
     assert body["saju"]["pillars"]["year"]["pillar"]
 
 
+def test_root_probe_returns_ok() -> None:
+    client = TestClient(app)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
 def test_final_reading_happy_path() -> None:
     app.dependency_overrides[get_llm_provider] = lambda: MockProvider()
     client = TestClient(app)

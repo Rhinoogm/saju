@@ -152,8 +152,12 @@ function apiBaseUrl() {
   return baseUrl.replace(/\/+$/, "");
 }
 
+function apiUrl(path: string) {
+  return `${apiBaseUrl()}/${path.replace(/^\/+/, "")}`;
+}
+
 async function postJson<TResponse>(path: string, payload: unknown): Promise<TResponse> {
-  const response = await fetch(`${apiBaseUrl()}${path}`, {
+  const response = await fetch(apiUrl(path), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

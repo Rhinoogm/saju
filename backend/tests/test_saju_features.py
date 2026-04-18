@@ -37,6 +37,7 @@ def test_prompt_places_initial_concern_before_chart_data(sample_request, sample_
     assert built.prompt.index("사용자 초기 입력") < built.prompt.index("사주 명식 데이터")
     assert sample_request.initial_concern in built.prompt
     assert built.schema_name == "QuestionGenerationOutput"
+    assert built.schema["$defs"]["DiagnosticQuestion"]["properties"]["intent_signal"]["minLength"] == 1
 
 
 def test_final_prompt_requests_report_structure(sample_request, sample_saju_data) -> None:

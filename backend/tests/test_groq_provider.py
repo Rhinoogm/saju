@@ -114,6 +114,45 @@ async def test_groq_auto_retries_json_schema_400_with_json_object() -> None:
 
 
 @pytest.mark.asyncio
+async def test_groq_auto_retries_json_schema_validation_400_with_json_object() -> None:
+    requests: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.content))
+        if len(requests) == 1:
+            return httpx.Response(
+                400,
+                json={
+                    "error": {
+                        "message": "Generated JSON does not match the expected schema.",
+                        "type": "invalid_request_error",
+                        "code": "json_validate_failed",
+                    }
+                },
+            )
+        return _chat_completion(model="fallback-model")
+
+    provider = GroqProvider(
+        api_key="test-key",
+        base_url="http://groq.test/openai/v1",
+        model="openai/gpt-oss-20b",
+        transport=httpx.MockTransport(handler),
+    )
+
+    response = await provider.generate(
+        system="system",
+        prompt="prompt",
+        schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+        schema_name="TestOutput",
+    )
+
+    assert len(requests) == 2
+    assert requests[0]["response_format"]["type"] == "json_schema"
+    assert requests[1]["response_format"] == {"type": "json_object"}
+    assert response.model == "fallback-model"
+
+
+@pytest.mark.asyncio
 async def test_groq_raises_rate_limit_error_for_429() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(

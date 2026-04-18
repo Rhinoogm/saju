@@ -125,7 +125,13 @@ class GroqProvider:
         if status_code != 400:
             return False
         normalized_error = error_text.lower()
-        return "json_schema" in normalized_error and "response_format" in normalized_error
+        return (
+            "json_schema" in normalized_error
+            and "response_format" in normalized_error
+        ) or (
+            "json_validate_failed" in normalized_error
+            or "generated json does not match" in normalized_error
+        )
 
     async def generate(
         self,

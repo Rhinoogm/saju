@@ -38,6 +38,10 @@ def create_app() -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.get("/")
+    async def root() -> dict[str, str]:
+        return {"status": "ok", "service": settings.app_name}
+
     if settings.enable_admin_prompts:
         app.include_router(admin_prompts_router)
     app.include_router(saju_router)
