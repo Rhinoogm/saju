@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     groq_api_key: str | None = None
     groq_timeout_seconds: float = 60.0
     groq_temperature: float = 0.25
+    groq_response_format_mode: Literal["auto", "json_schema", "json_object", "none"] = "auto"
+    groq_json_schema_strict: bool = True
 
     cors_origins: str = Field(default="http://localhost:3000,http://127.0.0.1:3000")
     cors_origin_regex: str | None = (

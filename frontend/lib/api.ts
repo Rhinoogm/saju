@@ -92,13 +92,29 @@ export interface GenerateQuestionsResponse {
   meta: ResponseMeta;
 }
 
+export interface ReadingInsightCard {
+  title: string;
+  headline: string;
+  body: string;
+}
+
+export interface ReadingSection {
+  title: string;
+  body: string;
+}
+
 export interface FinalReading {
+  reading_title: string;
   desired_conclusion: string;
   core_message: string;
   final_text: string;
+  summary_cards: ReadingInsightCard[];
+  deep_sections: ReadingSection[];
   answer_signals: string[];
   saju_basis: string[];
+  timing_points: string[];
   action_steps: string[];
+  watchouts: string[];
   caution: string;
 }
 

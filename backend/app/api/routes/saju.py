@@ -43,6 +43,8 @@ def get_llm_provider(settings: Settings = Depends(get_settings)) -> LLMProvider:
             model=settings.groq_model,
             timeout_seconds=settings.groq_timeout_seconds,
             temperature=settings.groq_temperature,
+            response_format_mode=settings.groq_response_format_mode,
+            json_schema_strict=settings.groq_json_schema_strict,
         )
 
     return OllamaProvider(

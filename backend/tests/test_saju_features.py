@@ -1,5 +1,5 @@
-from app.schemas.saju import Gender
-from app.services.prompt_builder import build_question_generation_prompt
+from app.schemas.saju import FinalReadingRequest, Gender
+from app.services.prompt_builder import build_final_reading_prompt, build_question_generation_prompt
 from app.services.saju_features import build_daewoon, ten_god
 
 
@@ -37,3 +37,26 @@ def test_prompt_places_initial_concern_before_chart_data(sample_request, sample_
     assert built.prompt.index("사용자 초기 입력") < built.prompt.index("사주 명식 데이터")
     assert sample_request.initial_concern in built.prompt
     assert built.schema_name == "QuestionGenerationOutput"
+
+
+def test_final_prompt_requests_report_structure(sample_request, sample_saju_data) -> None:
+    payload = sample_request.model_dump(mode="json")
+    payload["answers"] = [
+        {
+            "question_id": f"q{index}",
+            "question": f"질문 {index}",
+            "answer": "조건을 확인하고 움직이고 싶습니다.",
+            "selected_option_id": "A",
+        }
+        for index in range(1, 6)
+    ]
+    built = build_final_reading_prompt(FinalReadingRequest(**payload), sample_saju_data)
+
+    assert "프리미엄 최종 사주풀이 리포트" in built.prompt
+    assert "summary_cards" in built.prompt
+    assert "deep_sections" in built.prompt
+    assert "timing_points" in built.prompt
+    assert "진단 질문 답변" in built.prompt
+    assert sample_request.initial_concern in built.prompt
+    assert built.schema_name == "FinalReadingOutput"
+    assert "summary_cards" in built.schema["properties"]

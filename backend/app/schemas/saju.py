@@ -169,15 +169,35 @@ class FinalReadingRequest(InitialProfile):
         return self
 
 
+class ReadingInsightCard(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(..., min_length=2, max_length=30)
+    headline: str = Field(..., min_length=4, max_length=80)
+    body: str = Field(..., min_length=20, max_length=240)
+
+
+class ReadingSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(..., min_length=2, max_length=36)
+    body: str = Field(..., min_length=60, max_length=700)
+
+
 class FinalReadingOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    reading_title: str = Field(..., min_length=4, max_length=80)
     desired_conclusion: str = Field(..., min_length=4, max_length=160)
     core_message: str = Field(..., min_length=8, max_length=220)
     final_text: str = Field(..., min_length=80, max_length=3500)
+    summary_cards: list[ReadingInsightCard] = Field(..., min_length=4, max_length=4)
+    deep_sections: list[ReadingSection] = Field(..., min_length=4, max_length=4)
     answer_signals: list[str] = Field(..., min_length=3, max_length=5)
     saju_basis: list[str] = Field(..., min_length=3, max_length=5)
+    timing_points: list[str] = Field(..., min_length=2, max_length=4)
     action_steps: list[str] = Field(..., min_length=2, max_length=4)
+    watchouts: list[str] = Field(..., min_length=2, max_length=3)
     caution: str = Field(..., min_length=8, max_length=240)
 
 
