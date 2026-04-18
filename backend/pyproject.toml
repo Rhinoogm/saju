@@ -1,0 +1,30 @@
+[project]
+name = "saju-backend"
+version = "0.1.0"
+description = "FastAPI backend for a two-step saju and psychology reading MVP."
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.115.0,<1.0.0",
+  "uvicorn[standard]>=0.30.0,<1.0.0",
+  "pydantic-settings>=2.4.0,<3.0.0",
+  "httpx>=0.27.0,<1.0.0",
+  "sajupy==0.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0,<9.0.0",
+  "pytest-asyncio>=0.23.0,<1.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app", "app.api", "app.api.routes", "app.schemas", "app.services", "app.services.llm"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
