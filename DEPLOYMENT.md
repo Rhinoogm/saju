@@ -85,7 +85,7 @@ Vercel Dashboard에서 `Add New > Project`를 선택하고 같은 GitHub repo를
 - Root Directory: `frontend`
 - Install Command: `npm install`
 - Build Command: `npm run build`
-- Output Directory: Vercel 기본값
+- Output Directory: 비워둔다. Next.js는 Vercel이 자동으로 처리하므로 `public`을 입력하지 않는다.
 
 환경변수:
 
@@ -95,6 +95,8 @@ ENABLE_ADMIN_PROMPTS=false
 ```
 
 Production과 Preview 환경에 같은 값으로 시작한다.
+
+`No Output Directory named "public" found after the Build completed` 오류가 나면 Vercel Project Settings의 Output Directory가 `public`으로 덮어써진 상태다. `Settings > Build & Development Settings`에서 Framework Preset을 `Next.js`로 바꾸고 Output Directory override를 끄거나 빈 값으로 저장한 뒤 다시 배포한다.
 
 ## 5. CORS 최종 고정
 
