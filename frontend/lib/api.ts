@@ -145,10 +145,11 @@ export class ApiError extends Error {
 }
 
 function apiBaseUrl() {
-  return (
+  const baseUrl =
     process.env.NEXT_PUBLIC_API_BASE_URL ??
-    (typeof window === "undefined" ? "http://localhost:8000" : `${window.location.protocol}//${window.location.hostname}:8000`)
-  );
+    (typeof window === "undefined" ? "http://localhost:8000" : `${window.location.protocol}//${window.location.hostname}:8000`);
+
+  return baseUrl.replace(/\/+$/, "");
 }
 
 async function postJson<TResponse>(path: string, payload: unknown): Promise<TResponse> {

@@ -90,7 +90,7 @@ Vercel Dashboard에서 `Add New > Project`를 선택하고 같은 GitHub repo를
 환경변수:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=https://saju-backend-d90s.onrender.com/
+NEXT_PUBLIC_API_BASE_URL=https://saju-backend-d90s.onrender.com
 ENABLE_ADMIN_PROMPTS=false
 ```
 
