@@ -59,6 +59,7 @@ def get_llm_provider(request: Request, settings: Settings = Depends(get_settings
             response_format_mode=settings.groq_response_format_mode,
             json_schema_strict=settings.groq_json_schema_strict,
             max_completion_tokens=settings.groq_max_completion_tokens,
+            max_request_tokens=settings.groq_max_request_tokens,
         )
 
     return OllamaProvider(

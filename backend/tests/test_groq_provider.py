@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from app.services.llm.base import LLMProviderError, LLMRateLimitError
-from app.services.llm.groq_provider import GroqProvider
+from app.services.llm.groq_provider import GroqProvider, _MIN_COMPLETION_TOKENS
 
 
 def _chat_completion(content: str = '{"ok":true}', *, model: str = "test-model", finish_reason: str = "stop") -> httpx.Response:
@@ -98,6 +98,65 @@ async def test_groq_sends_configured_max_completion_tokens() -> None:
     )
 
     assert requests[0]["max_completion_tokens"] == 2048
+
+
+@pytest.mark.asyncio
+async def test_groq_caps_completion_tokens_to_fit_request_budget() -> None:
+    requests: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.content))
+        return _chat_completion()
+
+    provider = GroqProvider(
+        api_key="test-key",
+        base_url="http://groq.test/openai/v1",
+        model="openai/gpt-oss-20b",
+        max_completion_tokens=1200,
+        max_request_tokens=2000,
+        transport=httpx.MockTransport(handler),
+    )
+
+    await provider.generate(
+        system="system",
+        prompt="a" * 4000,
+        schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+        schema_name="TestOutput",
+    )
+
+    assert _MIN_COMPLETION_TOKENS <= requests[0]["max_completion_tokens"] < 1200
+    assert (
+        GroqProvider._estimate_payload_tokens(requests[0])
+        + requests[0]["max_completion_tokens"]
+        <= 2000
+    )
+
+
+@pytest.mark.asyncio
+async def test_groq_raises_clear_error_when_prompt_exceeds_request_budget() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("oversized request should not be sent")
+
+    provider = GroqProvider(
+        api_key="test-key",
+        base_url="http://groq.test/openai/v1",
+        model="openai/gpt-oss-20b",
+        max_completion_tokens=1200,
+        max_request_tokens=1200,
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(LLMProviderError) as exc_info:
+        await provider.generate(
+            system="system",
+            prompt="a" * 8000,
+            schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+            schema_name="TestOutput",
+        )
+
+    message = str(exc_info.value)
+    assert "Groq request is too large" in message
+    assert "GROQ_MAX_REQUEST_TOKENS=1200" in message
 
 
 @pytest.mark.asyncio

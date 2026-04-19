@@ -8,6 +8,8 @@ import httpx
 from app.services.llm.base import LLMProviderError, LLMRateLimitError, LLMResponse, LLMTimeoutError
 
 _ERROR_BODY_LIMIT = 500
+_TOKEN_BUDGET_BUFFER = 128
+_MIN_COMPLETION_TOKENS = 256
 _JSON_SCHEMA_RESPONSE_FORMAT = "json_schema"
 _JSON_OBJECT_RESPONSE_FORMAT = "json_object"
 _STRICT_JSON_SCHEMA_MODELS = frozenset(
@@ -37,6 +39,7 @@ class GroqProvider:
         response_format_mode: Literal["auto", "json_schema", "json_object", "none"] = "auto",
         json_schema_strict: bool = True,
         max_completion_tokens: int | None = 4096,
+        max_request_tokens: int | None = 8000,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.api_key = api_key
@@ -47,6 +50,7 @@ class GroqProvider:
         self.response_format_mode = response_format_mode
         self.json_schema_strict = json_schema_strict
         self.max_completion_tokens = max_completion_tokens
+        self.max_request_tokens = max_request_tokens
         self.transport = transport
 
     def _auto_json_schema_strict(self) -> bool | None:
@@ -89,6 +93,38 @@ class GroqProvider:
             f"JSON Schema: {schema_json}"
         )
 
+    @staticmethod
+    def _estimate_text_tokens(value: str) -> int:
+        if not value:
+            return 0
+        return max((len(value) + 3) // 4, (len(value.encode("utf-8")) + 2) // 3)
+
+    @classmethod
+    def _estimate_payload_tokens(cls, payload: dict[str, Any]) -> int:
+        payload_without_completion = {
+            key: value
+            for key, value in payload.items()
+            if key != "max_completion_tokens"
+        }
+        serialized = json.dumps(payload_without_completion, ensure_ascii=False, separators=(",", ":"))
+        return cls._estimate_text_tokens(serialized)
+
+    def _fit_completion_budget(self, payload: dict[str, Any]) -> None:
+        if self.max_completion_tokens is None or self.max_request_tokens is None:
+            return
+
+        prompt_tokens = self._estimate_payload_tokens(payload)
+        available_completion_tokens = self.max_request_tokens - prompt_tokens - _TOKEN_BUDGET_BUFFER
+        if available_completion_tokens < _MIN_COMPLETION_TOKENS:
+            raise LLMProviderError(
+                "Groq request is too large for the configured token-per-minute budget. "
+                f"Estimated prompt tokens: {prompt_tokens}, "
+                f"GROQ_MAX_REQUEST_TOKENS={self.max_request_tokens}. "
+                "Shorten the prompt or raise GROQ_MAX_REQUEST_TOKENS for a higher Groq tier."
+            )
+
+        payload["max_completion_tokens"] = min(self.max_completion_tokens, available_completion_tokens)
+
     def _build_payload(
         self,
         *,
@@ -119,6 +155,7 @@ class GroqProvider:
             payload["max_completion_tokens"] = self.max_completion_tokens
         if isinstance(resolved_response_format, dict):
             payload["response_format"] = resolved_response_format
+        self._fit_completion_budget(payload)
         return payload
 
     @staticmethod

@@ -12,3 +12,4 @@ def test_llm_completion_token_defaults_are_large_enough_for_final_reading() -> N
 
     assert settings.ollama_num_predict == 4096
     assert settings.groq_max_completion_tokens == 4096
+    assert settings.groq_max_request_tokens == 8000

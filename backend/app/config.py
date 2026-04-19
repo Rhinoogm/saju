@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     groq_response_format_mode: Literal["auto", "json_schema", "json_object", "none"] = "auto"
     groq_json_schema_strict: bool = True
     groq_max_completion_tokens: int = Field(default=4096, ge=256, le=65536)
+    groq_max_request_tokens: int | None = Field(default=8000, ge=1024, le=1_000_000)
 
     cors_origins: str = Field(default="http://localhost:3000,http://127.0.0.1:3000")
     cors_origin_regex: str | None = (
