@@ -77,7 +77,7 @@ export interface QuestionAnswer {
   question_id: string;
   question: string;
   answer: string;
-  selected_option_id: string | null;
+  selected_option_ids: string[];
 }
 
 export interface ResponseMeta {

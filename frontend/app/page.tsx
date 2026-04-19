@@ -60,7 +60,7 @@ function emptyAnswers(questions: DiagnosticQuestion[]): QuestionAnswer[] {
     question_id: question.id,
     question: question.text,
     answer: "",
-    selected_option_id: null,
+    selected_option_ids: [],
   }));
 }
 

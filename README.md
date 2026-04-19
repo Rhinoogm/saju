@@ -109,8 +109,8 @@ npm run dev
     {
       "question_id": "q1",
       "question": "지금 고민에서 가장 크게 걸리는 것은 무엇인가요?",
-      "answer": "돈과 조건",
-      "selected_option_id": "A"
+      "answer": "돈과 조건, 인정받지 못하는 느낌",
+      "selected_option_ids": ["A", "B"]
     }
   ]
 }

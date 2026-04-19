@@ -18,37 +18,45 @@ export function QuestionsForm({ questions, answers, loading, onBack, onAnswerCha
   const [customQuestionIds, setCustomQuestionIds] = useState<Set<string>>(() => new Set());
   const isComplete = answers.length === 5 && answers.every((answer) => answer.answer.trim().length > 0);
 
-  function updateAnswer(question: DiagnosticQuestion, value: string, selectedOptionId: string | null) {
+  function updateAnswer(question: DiagnosticQuestion, value: string, selectedOptionIds: string[]) {
     onAnswerChange(
       answers.map((answer) =>
         answer.question_id === question.id
           ? {
               ...answer,
               answer: value,
-              selected_option_id: selectedOptionId,
+              selected_option_ids: selectedOptionIds,
             }
           : answer,
       ),
     );
   }
 
-  function selectOption(question: DiagnosticQuestion, value: string, selectedOptionId: string) {
+  function selectOption(question: DiagnosticQuestion, selectedOptionId: string) {
     setCustomQuestionIds((current) => {
       const next = new Set(current);
       next.delete(question.id);
       return next;
     });
-    updateAnswer(question, value, selectedOptionId);
+
+    const answer = answers.find((item) => item.question_id === question.id);
+    const currentSelected = answer?.selected_option_ids ?? [];
+    const nextSelected = currentSelected.includes(selectedOptionId)
+      ? currentSelected.filter((optionId) => optionId !== selectedOptionId)
+      : [...currentSelected, selectedOptionId];
+    const selectedLabels = question.options.filter((option) => nextSelected.includes(option.id)).map((option) => option.label);
+
+    updateAnswer(question, selectedLabels.join(", "), nextSelected);
   }
 
   function selectCustomAnswer(question: DiagnosticQuestion, value = "") {
     setCustomQuestionIds((current) => new Set(current).add(question.id));
-    updateAnswer(question, value, null);
+    updateAnswer(question, value, []);
   }
 
   function updateCustomAnswer(question: DiagnosticQuestion, value: string) {
     setCustomQuestionIds((current) => new Set(current).add(question.id));
-    updateAnswer(question, value, null);
+    updateAnswer(question, value, []);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -77,26 +85,26 @@ export function QuestionsForm({ questions, answers, loading, onBack, onAnswerCha
           const answer = answers.find((item) => item.question_id === question.id);
           const customSelected =
             question.type === "single_choice" &&
-            (customQuestionIds.has(question.id) || (answer?.selected_option_id === null && (answer?.answer.trim().length ?? 0) > 0));
+            (customQuestionIds.has(question.id) || ((answer?.selected_option_ids.length ?? 0) === 0 && (answer?.answer.trim().length ?? 0) > 0));
           return (
             <section key={question.id} className="rounded-lg border border-stone-200 bg-cloud p-4">
               <div className="mb-3 flex items-start gap-3">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-mint text-sm font-black text-white">{index + 1}</span>
                 <div>
                   <h3 className="text-base font-black leading-7 text-ink">{question.text}</h3>
-                  <p className="mt-1 text-xs font-bold text-stone-500">{question.type === "single_choice" ? "하나를 선택하거나 직접 입력" : "짧게 입력"}</p>
+                  <p className="mt-1 text-xs font-bold text-stone-500">{question.type === "single_choice" ? "복수 선택하거나 직접 입력" : "짧게 입력"}</p>
                 </div>
               </div>
 
               {question.type === "single_choice" ? (
                 <div className="grid gap-2">
                   {question.options.map((option) => {
-                    const selected = answer?.selected_option_id === option.id;
+                    const selected = answer?.selected_option_ids.includes(option.id) ?? false;
                     return (
                       <button
                         key={option.id}
                         type="button"
-                        onClick={() => selectOption(question, option.label, option.id)}
+                        onClick={() => selectOption(question, option.id)}
                         className={`flex min-h-[48px] items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm font-bold leading-6 transition ${
                           selected ? "border-coral bg-white text-coral shadow-sm" : "border-stone-200 bg-white text-stone-700 hover:border-mint"
                         }`}
@@ -111,7 +119,7 @@ export function QuestionsForm({ questions, answers, loading, onBack, onAnswerCha
                   })}
                   <button
                     type="button"
-                    onClick={() => selectCustomAnswer(question, answer?.selected_option_id === null ? answer.answer : "")}
+                    onClick={() => selectCustomAnswer(question, (answer?.selected_option_ids.length ?? 0) === 0 ? answer?.answer ?? "" : "")}
                     className={`flex min-h-[48px] items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm font-bold leading-6 transition ${
                       customSelected ? "border-coral bg-white text-coral shadow-sm" : "border-stone-200 bg-white text-stone-700 hover:border-mint"
                     }`}
@@ -125,7 +133,7 @@ export function QuestionsForm({ questions, answers, loading, onBack, onAnswerCha
                   {customSelected && (
                     <textarea
                       className="min-h-24 w-full resize-y rounded-lg border border-stone-200 bg-white px-4 py-3 text-base leading-7 text-ink outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
-                      value={answer?.selected_option_id === null ? answer.answer : ""}
+                      value={(answer?.selected_option_ids.length ?? 0) === 0 ? answer?.answer ?? "" : ""}
                       onChange={(event) => updateCustomAnswer(question, event.target.value)}
                       placeholder="보기 중 맞는 답이 없다면 직접 적어주세요."
                       required
@@ -136,7 +144,7 @@ export function QuestionsForm({ questions, answers, loading, onBack, onAnswerCha
                 <textarea
                   className="min-h-28 w-full resize-y rounded-lg border border-stone-200 bg-white px-4 py-3 text-base leading-7 text-ink outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
                   value={answer?.answer ?? ""}
-                  onChange={(event) => updateAnswer(question, event.target.value, null)}
+                  onChange={(event) => updateAnswer(question, event.target.value, [])}
                   placeholder="떠오르는 답을 짧게 적어주세요."
                   required
                 />

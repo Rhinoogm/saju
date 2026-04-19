@@ -147,7 +147,7 @@ def answer_payload() -> list[dict]:
             "question_id": item["id"],
             "question": item["text"],
             "answer": item["options"][0]["label"] if item["options"] else "이제 움직여도 된다는 말",
-            "selected_option_id": item["options"][0]["id"] if item["options"] else None,
+            "selected_option_ids": [item["options"][0]["id"]] if item["options"] else [],
         }
         for item in QUESTION_PAYLOAD["questions"]
     ]
@@ -167,6 +167,40 @@ def test_generate_questions_happy_path() -> None:
     assert body["questions"][0]["id"] == "q1"
     assert body["saju"]["pillars"]["year"]["pillar"]
     assert body["meta"]["provider"] == "mock"
+
+
+def test_generate_questions_strips_option_labels_from_question_text() -> None:
+    payload = {
+        "questions": [
+            {
+                **question,
+                "text": f'{question["text"]} (A) {question["options"][0]["label"]} (B) {question["options"][1]["label"]}',
+            }
+            if question["type"] == "single_choice"
+            else question
+            for question in QUESTION_PAYLOAD["questions"]
+        ]
+    }
+
+    class QuestionTextWithOptionsProvider:
+        async def generate(self, *, system: str, prompt: str, schema: dict, schema_name: str) -> LLMResponse:
+            return LLMResponse(
+                content=json.dumps(payload, ensure_ascii=False),
+                model="test-model",
+                provider="mock",
+                raw_metadata={},
+            )
+
+    app.dependency_overrides[get_llm_provider] = lambda: QuestionTextWithOptionsProvider()
+    client = TestClient(app)
+
+    response = client.post("/api/generate-questions", json=initial_payload())
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    body = response.json()
+    assert "(A)" not in body["questions"][0]["text"]
+    assert body["questions"][0]["text"] == QUESTION_PAYLOAD["questions"][0]["text"]
 
 
 def test_generate_questions_rate_limit() -> None:

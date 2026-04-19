@@ -47,7 +47,7 @@ def test_final_prompt_requests_report_structure(sample_request, sample_saju_data
             "question_id": f"q{index}",
             "question": f"질문 {index}",
             "answer": "조건을 확인하고 움직이고 싶습니다.",
-            "selected_option_id": "A",
+            "selected_option_ids": ["A", "B"],
         }
         for index in range(1, 6)
     ]

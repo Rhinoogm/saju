@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import re
 from enum import Enum
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+OptionId = Annotated[str, Field(pattern="^[A-D]$")]
+OPTION_MARKER_RE = re.compile(r"\s*(?:\([A-D]\)|[A-D][.)]|[①②③④])\s*")
 
 
 class CalendarType(str, Enum):
@@ -116,6 +121,12 @@ class DiagnosticQuestion(BaseModel):
             raise ValueError("single_choice questions must include at least 2 options")
         if self.type == "short_text" and self.options:
             raise ValueError("short_text questions must not include options")
+        if self.type == "single_choice":
+            marker = OPTION_MARKER_RE.search(self.text)
+            if marker is not None:
+                self.text = self.text[: marker.start()].rstrip()
+            if len(self.text) < 8:
+                raise ValueError("question text must not be only option labels")
         return self
 
 
@@ -149,12 +160,20 @@ class QuestionAnswer(BaseModel):
     question_id: str = Field(..., pattern="^q[1-5]$")
     question: str = Field(..., min_length=1, max_length=180)
     answer: str = Field(..., min_length=1, max_length=400)
-    selected_option_id: str | None = Field(default=None, pattern="^[A-D]$")
+    selected_option_ids: list[OptionId] = Field(default_factory=list, max_length=4)
+    selected_option_id: OptionId | None = None
 
     @field_validator("question", "answer")
     @classmethod
     def strip_answer_text(cls, value: str) -> str:
         return value.strip()
+
+    @model_validator(mode="after")
+    def normalize_selected_option_ids(self) -> "QuestionAnswer":
+        if self.selected_option_id is not None and not self.selected_option_ids:
+            self.selected_option_ids = [self.selected_option_id]
+        self.selected_option_ids = list(dict.fromkeys(self.selected_option_ids))
+        return self
 
 
 class FinalReadingRequest(InitialProfile):
