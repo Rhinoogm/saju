@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.admin_prompts import router as admin_prompts_router
+from app.api.routes.admin_prompts import settings_router as admin_settings_router
 from app.api.routes.saju import router as saju_router
 from app.config import get_settings
 from app.services.prompt_store import PromptStore
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
 
     if settings.enable_admin_prompts:
         app.include_router(admin_prompts_router)
+        app.include_router(admin_settings_router)
     app.include_router(saju_router)
     return app
 

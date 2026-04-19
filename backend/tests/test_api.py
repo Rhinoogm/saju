@@ -2,10 +2,13 @@ import json
 
 from fastapi.testclient import TestClient
 
+from app.config import Settings, get_settings
 from app.api.routes.saju import get_llm_provider
-from app.main import app
+from app.main import app, create_app
 from app.services.llm.base import LLMResponse
+from app.services.prompt_store import PromptStore
 from app.services.rate_limiter import InMemoryRateLimiter
+from app.services.runtime_settings import resolve_runtime_llm_settings
 
 
 QUESTION_PAYLOAD = {
@@ -89,7 +92,8 @@ FINAL_PAYLOAD = {
 
 class MockProvider:
     async def generate(self, *, system: str, prompt: str, schema: dict, schema_name: str) -> LLMResponse:
-        assert "Structured Output" in system
+        assert system.strip()
+        assert prompt.strip()
         assert schema_name in {"QuestionGenerationOutput", "FinalReadingOutput"}
         assert schema["type"] == "object"
         content = QUESTION_PAYLOAD if schema_name == "QuestionGenerationOutput" else FINAL_PAYLOAD
@@ -104,6 +108,21 @@ class MockProvider:
 class InvalidJsonProvider:
     async def generate(self, *, system: str, prompt: str, schema: dict, schema_name: str) -> LLMResponse:
         return LLMResponse(content="not json", model="test-model", provider="mock")
+
+
+class AlwaysInvalidFinalReadingProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def generate(self, *, system: str, prompt: str, schema: dict, schema_name: str) -> LLMResponse:
+        self.calls += 1
+        return LLMResponse(content='{"reading_title":"끊긴 응답","final_text":"중간에서', model="test-model", provider="mock")
+
+
+class SchemaInvalidFinalReadingProvider:
+    async def generate(self, *, system: str, prompt: str, schema: dict, schema_name: str) -> LLMResponse:
+        payload = {**FINAL_PAYLOAD, "summary_cards": FINAL_PAYLOAD["summary_cards"][:2]}
+        return LLMResponse(content=json.dumps(payload, ensure_ascii=False), model="test-model", provider="mock")
 
 
 def initial_payload() -> dict:
@@ -135,7 +154,8 @@ def answer_payload() -> list[dict]:
 
 
 def test_generate_questions_happy_path() -> None:
-    app.dependency_overrides[get_llm_provider] = lambda: MockProvider()
+    provider = MockProvider()
+    app.dependency_overrides[get_llm_provider] = lambda: provider
     client = TestClient(app)
 
     response = client.post("/api/generate-questions", json=initial_payload())
@@ -167,12 +187,73 @@ def test_generate_questions_rate_limit() -> None:
     assert "요청 한도" in second_response.json()["detail"]
 
 
-def test_admin_prompts_router_disabled_by_default() -> None:
-    client = TestClient(app)
+def test_admin_prompts_router_disabled_when_configured_off(monkeypatch) -> None:
+    monkeypatch.setenv("ENABLE_ADMIN_PROMPTS", "false")
+    get_settings.cache_clear()
 
-    response = client.get("/api/admin/prompts")
+    try:
+        disabled_app = create_app()
+        client = TestClient(disabled_app)
+
+        response = client.get("/api/admin/prompts")
+    finally:
+        get_settings.cache_clear()
 
     assert response.status_code == 404
+
+
+def test_admin_llm_settings_round_trip(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("ENABLE_ADMIN_PROMPTS", "true")
+    monkeypatch.setenv("ADMIN_API_KEY", "secret")
+    monkeypatch.setenv("PROMPTS_DB_PATH", str(tmp_path / "prompts.sqlite3"))
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    monkeypatch.setenv("GROQ_MODEL", "openai/gpt-oss-20b")
+    monkeypatch.setenv("OLLAMA_MODEL", "qwen3:4b")
+    get_settings.cache_clear()
+
+    try:
+        enabled_app = create_app()
+        client = TestClient(enabled_app)
+        headers = {"X-Admin-Key": "secret"}
+
+        initial = client.get("/api/admin/settings/llm", headers=headers)
+        saved = client.put(
+            "/api/admin/settings/llm",
+            headers=headers,
+            json={
+                "llm_provider": "groq",
+                "groq_model": "openai/gpt-oss-120b",
+                "ollama_model": "qwen3:8b",
+            },
+        )
+        loaded = client.get("/api/admin/settings/llm", headers=headers)
+    finally:
+        get_settings.cache_clear()
+
+    assert initial.status_code == 200
+    assert initial.json()["llm_provider"] == "ollama"
+    assert initial.json()["groq_model"] == "openai/gpt-oss-20b"
+    assert saved.status_code == 200
+    assert saved.json()["llm_provider"] == "groq"
+    assert saved.json()["groq_model"] == "openai/gpt-oss-120b"
+    assert loaded.json()["ollama_model"] == "qwen3:8b"
+
+
+def test_runtime_llm_settings_prefer_saved_values(tmp_path) -> None:
+    store = PromptStore(str(tmp_path / "prompts.sqlite3"))
+    store.init()
+    store.set_setting("llm_provider", "groq")
+    store.set_setting("groq_model", "openai/gpt-oss-120b")
+    store.set_setting("ollama_model", "qwen3:8b")
+
+    resolved = resolve_runtime_llm_settings(
+        Settings(llm_provider="ollama", groq_model="openai/gpt-oss-20b", ollama_model="qwen3:4b"),
+        store,
+    )
+
+    assert resolved.llm_provider == "groq"
+    assert resolved.groq_model == "openai/gpt-oss-120b"
+    assert resolved.ollama_model == "qwen3:8b"
 
 
 def test_saju_only_happy_path() -> None:
@@ -209,7 +290,8 @@ def test_root_probe_returns_ok() -> None:
 
 
 def test_final_reading_happy_path() -> None:
-    app.dependency_overrides[get_llm_provider] = lambda: MockProvider()
+    provider = MockProvider()
+    app.dependency_overrides[get_llm_provider] = lambda: provider
     client = TestClient(app)
 
     response = client.post("/api/final-reading", json={**initial_payload(), "answers": answer_payload()})
@@ -222,6 +304,31 @@ def test_final_reading_happy_path() -> None:
     assert [card["title"] for card in body["reading"]["summary_cards"]] == ["현재 핵심", "타고난 기질", "운의 흐름", "결정 기준"]
     assert len(body["reading"]["saju_basis"]) == 3
     assert len(body["reading"]["deep_sections"]) == 4
+
+
+def test_final_reading_reports_schema_validation_details() -> None:
+    provider = SchemaInvalidFinalReadingProvider()
+    app.dependency_overrides[get_llm_provider] = lambda: provider
+    client = TestClient(app)
+
+    response = client.post("/api/final-reading", json={**initial_payload(), "answers": answer_payload()})
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 502
+    assert "summary_cards" in response.json()["detail"]
+
+
+def test_final_reading_reports_json_syntax_error() -> None:
+    provider = AlwaysInvalidFinalReadingProvider()
+    app.dependency_overrides[get_llm_provider] = lambda: provider
+    client = TestClient(app)
+
+    response = client.post("/api/final-reading", json={**initial_payload(), "answers": answer_payload()})
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 502
+    assert provider.calls == 1
+    assert "JSON syntax error" in response.json()["detail"]
 
 
 def test_generate_questions_rejects_invalid_llm_json() -> None:

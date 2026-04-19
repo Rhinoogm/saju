@@ -24,8 +24,18 @@ from app.services.llm.ollama_provider import OllamaProvider
 from app.services.prompt_builder import build_final_reading_prompt, build_question_generation_prompt
 from app.services.prompt_store import PromptStore
 from app.services.rate_limiter import enforce_llm_rate_limit
+from app.services.runtime_settings import resolve_runtime_llm_settings
 
 router = APIRouter(prefix="/api", tags=["saju"])
+
+
+class LLMInvalidOutputError(ValueError):
+    def __init__(self, *, label: str, content: str, reason: str, details: list[str] | None = None) -> None:
+        super().__init__(f"LLM returned invalid {label}: {reason}")
+        self.label = label
+        self.content = content
+        self.reason = reason
+        self.details = details or []
 
 
 def get_calendar_service() -> CalendarService:
@@ -36,24 +46,28 @@ def get_prompt_store(request: Request) -> PromptStore | None:
     return getattr(request.app.state, "prompt_store", None)
 
 
-def get_llm_provider(settings: Settings = Depends(get_settings)) -> LLMProvider:
-    if settings.llm_provider == "groq":
+def get_llm_provider(request: Request, settings: Settings = Depends(get_settings)) -> LLMProvider:
+    runtime_settings = resolve_runtime_llm_settings(settings, get_prompt_store(request))
+
+    if runtime_settings.llm_provider == "groq":
         return GroqProvider(
             api_key=settings.groq_api_key,
             base_url=settings.groq_base_url,
-            model=settings.groq_model,
+            model=runtime_settings.groq_model,
             timeout_seconds=settings.groq_timeout_seconds,
             temperature=settings.groq_temperature,
             response_format_mode=settings.groq_response_format_mode,
             json_schema_strict=settings.groq_json_schema_strict,
+            max_completion_tokens=settings.groq_max_completion_tokens,
         )
 
     return OllamaProvider(
         base_url=settings.ollama_base_url,
-        model=settings.ollama_model,
+        model=runtime_settings.ollama_model,
         timeout_seconds=settings.ollama_timeout_seconds,
         temperature=settings.ollama_temperature,
         format_mode=settings.ollama_format_mode,
+        num_predict=settings.ollama_num_predict,
     )
 
 
@@ -65,7 +79,14 @@ def _meta(response: LLMResponse) -> ResponseMeta:
     )
 
 
-async def _call_llm(llm_provider: LLMProvider, *, system: str, prompt: str, schema: dict, schema_name: str) -> LLMResponse:
+async def _call_llm(
+    llm_provider: LLMProvider,
+    *,
+    system: str,
+    prompt: str,
+    schema: dict,
+    schema_name: str,
+) -> LLMResponse:
     try:
         return await llm_provider.generate(
             system=system,
@@ -96,12 +117,40 @@ def _parse_questions(content: str) -> QuestionGenerationOutput:
 
 def _parse_final_reading(content: str) -> FinalReadingOutput:
     try:
-        return FinalReadingOutput.model_validate(json.loads(content))
-    except (json.JSONDecodeError, ValidationError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"LLM returned invalid final reading JSON: {content[:500]}",
+        parsed = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise LLMInvalidOutputError(
+            label="final reading JSON",
+            content=content,
+            reason=f"JSON syntax error at char {exc.pos}: {exc.msg}",
         ) from exc
+
+    try:
+        return FinalReadingOutput.model_validate(parsed)
+    except ValidationError as exc:
+        details = []
+        for error in exc.errors():
+            location = ".".join(str(part) for part in error["loc"])
+            details.append(f"{location}: {error['msg']}")
+        raise LLMInvalidOutputError(
+            label="final reading schema",
+            content=content,
+            reason="schema validation failed",
+            details=details,
+        ) from exc
+
+
+def _invalid_final_reading_http_error(error: LLMInvalidOutputError) -> HTTPException:
+    details = "; ".join(error.details[:8]) if error.details else error.reason
+    return HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail=(
+            "LLM returned invalid final reading output. "
+            f"Reason: {details}. "
+            f"Partial response: {error.content[:500]}"
+        ),
+    )
+
 
 
 @router.post(
@@ -161,7 +210,10 @@ async def final_reading(
         schema=built_prompt.schema,
         schema_name=built_prompt.schema_name,
     )
-    output = _parse_final_reading(llm_response.content)
+    try:
+        output = _parse_final_reading(llm_response.content)
+    except LLMInvalidOutputError as exc:
+        raise _invalid_final_reading_http_error(exc) from exc
 
     return FinalReadingResponse(
         saju=saju,

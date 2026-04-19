@@ -36,6 +36,7 @@ class OllamaProvider:
         timeout_seconds: float = 120.0,
         temperature: float = 0.4,
         format_mode: Literal["auto", "schema", "json", "none"] = "auto",
+        num_predict: int | None = 4096,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
@@ -43,6 +44,7 @@ class OllamaProvider:
         self.timeout_seconds = timeout_seconds
         self.temperature = temperature
         self.format_mode = format_mode
+        self.num_predict = num_predict
         self.transport = transport
 
     @property
@@ -67,6 +69,8 @@ class OllamaProvider:
                 "temperature": self.temperature,
             },
         }
+        if self.num_predict is not None:
+            payload["options"]["num_predict"] = self.num_predict
 
         if self.format_mode == "none":
             return payload
@@ -149,6 +153,17 @@ class OllamaProvider:
             content = "".join(content_chunks)
             if not content.strip():
                 raise LLMProviderError("Ollama response did not include a non-empty 'response' field")
+
+            if metadata.get("done_reason") == "length":
+                limit_hint = (
+                    f"OLLAMA_NUM_PREDICT={self.num_predict}"
+                    if self.num_predict is not None
+                    else "the configured Ollama num_predict limit"
+                )
+                raise LLMProviderError(
+                    f"Ollama stopped before completing the response because {limit_hint} was reached. "
+                    "Increase OLLAMA_NUM_PREDICT or shorten the prompt."
+                )
 
             metadata.pop("context", None)
             model = metadata.get("model")

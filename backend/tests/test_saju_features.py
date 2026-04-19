@@ -1,6 +1,6 @@
 from app.schemas.saju import FinalReadingRequest, Gender
 from app.services.prompt_builder import build_final_reading_prompt, build_question_generation_prompt
-from app.services.saju_features import build_daewoon, ten_god
+from app.services.saju_features import build_daewoon, calculation_note, ten_god
 
 
 def test_ten_god_mapping_for_gap_day_master() -> None:
@@ -61,3 +61,10 @@ def test_final_prompt_requests_report_structure(sample_request, sample_saju_data
     assert sample_request.initial_concern in built.prompt
     assert built.schema_name == "FinalReadingOutput"
     assert "summary_cards" in built.schema["properties"]
+    assert "calculation_note" not in built.prompt
+    assert "MVP" not in built.prompt
+
+
+def test_calculation_note_does_not_expose_internal_mvp_wording() -> None:
+    assert "MVP" not in calculation_note(Gender.male)
+    assert "MVP" not in calculation_note(Gender.other)

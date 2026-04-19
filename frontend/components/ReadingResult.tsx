@@ -148,8 +148,7 @@ export function ReadingResult({ result, onBack, onRestart }: ReadingResultProps)
         <div className="mb-4 flex items-center gap-2 text-sm font-black text-honey">
           <Sparkles size={18} aria-hidden /> 결론
         </div>
-        <p className="max-w-3xl text-2xl font-black leading-9 sm:text-3xl sm:leading-10">{reading.core_message}</p>
-        <p className="mt-4 max-w-3xl rounded-lg bg-white/10 px-4 py-3 text-sm font-bold leading-6 text-white/90">{reading.desired_conclusion}</p>
+        <p className="max-w-3xl text-xl font-black leading-8 sm:text-2xl sm:leading-9">{reading.core_message}</p>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

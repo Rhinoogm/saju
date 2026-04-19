@@ -36,6 +36,7 @@ class GroqProvider:
         temperature: float = 0.25,
         response_format_mode: Literal["auto", "json_schema", "json_object", "none"] = "auto",
         json_schema_strict: bool = True,
+        max_completion_tokens: int | None = 4096,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.api_key = api_key
@@ -45,6 +46,7 @@ class GroqProvider:
         self.temperature = temperature
         self.response_format_mode = response_format_mode
         self.json_schema_strict = json_schema_strict
+        self.max_completion_tokens = max_completion_tokens
         self.transport = transport
 
     def _auto_json_schema_strict(self) -> bool | None:
@@ -113,6 +115,8 @@ class GroqProvider:
             ],
             "temperature": self.temperature,
         }
+        if self.max_completion_tokens is not None:
+            payload["max_completion_tokens"] = self.max_completion_tokens
         if isinstance(resolved_response_format, dict):
             payload["response_format"] = resolved_response_format
         return payload
@@ -187,9 +191,21 @@ class GroqProvider:
 
         body = response.json()
         try:
-            content = body["choices"][0]["message"]["content"]
+            choice = body["choices"][0]
+            content = choice["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
             raise LLMProviderError("Groq response did not include choices[0].message.content") from exc
+
+        if isinstance(choice, dict) and choice.get("finish_reason") == "length":
+            limit_hint = (
+                f"GROQ_MAX_COMPLETION_TOKENS={self.max_completion_tokens}"
+                if self.max_completion_tokens is not None
+                else "the configured Groq completion token limit"
+            )
+            raise LLMProviderError(
+                f"Groq stopped before completing the response because {limit_hint} was reached. "
+                "Increase GROQ_MAX_COMPLETION_TOKENS or shorten the prompt."
+            )
 
         if not isinstance(content, str) or not content.strip():
             raise LLMProviderError("Groq response content was empty")

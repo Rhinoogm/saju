@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     ollama_timeout_seconds: float = 120.0
     ollama_temperature: float = 0.25
     ollama_format_mode: Literal["auto", "schema", "json", "none"] = "auto"
+    ollama_num_predict: int = Field(default=4096, ge=256, le=32768)
 
     groq_base_url: str = "https://api.groq.com/openai/v1"
     groq_model: str = "llama-3.1-8b-instant"
@@ -31,6 +32,7 @@ class Settings(BaseSettings):
     groq_temperature: float = 0.25
     groq_response_format_mode: Literal["auto", "json_schema", "json_object", "none"] = "auto"
     groq_json_schema_strict: bool = True
+    groq_max_completion_tokens: int = Field(default=4096, ge=256, le=65536)
 
     cors_origins: str = Field(default="http://localhost:3000,http://127.0.0.1:3000")
     cors_origin_regex: str | None = (

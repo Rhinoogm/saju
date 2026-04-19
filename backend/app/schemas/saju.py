@@ -189,8 +189,8 @@ class FinalReadingOutput(BaseModel):
 
     reading_title: str = Field(..., min_length=4, max_length=80)
     desired_conclusion: str = Field(..., min_length=4, max_length=160)
-    core_message: str = Field(..., min_length=8, max_length=220)
-    final_text: str = Field(..., min_length=80, max_length=3500)
+    core_message: str = Field(..., min_length=8, max_length=120)
+    final_text: str = Field(..., min_length=80, max_length=1200)
     summary_cards: list[ReadingInsightCard] = Field(..., min_length=4, max_length=4)
     deep_sections: list[ReadingSection] = Field(..., min_length=4, max_length=4)
     answer_signals: list[str] = Field(..., min_length=3, max_length=5)

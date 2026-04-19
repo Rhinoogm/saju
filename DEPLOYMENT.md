@@ -50,9 +50,12 @@ GROQ_API_KEY=<your-groq-api-key>
 GROQ_MODEL=openai/gpt-oss-20b
 GROQ_RESPONSE_FORMAT_MODE=auto
 GROQ_JSON_SCHEMA_STRICT=true
+GROQ_MAX_COMPLETION_TOKENS=4096
 GROQ_TIMEOUT_SECONDS=60
 
-ENABLE_ADMIN_PROMPTS=false
+ENABLE_ADMIN_PROMPTS=true
+ADMIN_API_KEY=<admin-password>
+PROMPTS_DB_PATH=./prompts.sqlite3
 CORS_ORIGINS=https://saju-frontend.vercel.app
 CORS_ORIGIN_REGEX=
 
@@ -91,10 +94,11 @@ Vercel Dashboard에서 `Add New > Project`를 선택하고 같은 GitHub repo를
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=https://saju-backend-d90s.onrender.com
-ENABLE_ADMIN_PROMPTS=false
 ```
 
 Production과 Preview 환경에 같은 값으로 시작한다.
+
+배포 후 메인 화면 오른쪽 위 설정 버튼을 누르고 Render의 `ADMIN_API_KEY` 값으로 로그인하면 `/admin/prompts`에서 프롬프트를 수정할 수 있다.
 
 `No Output Directory named "public" found after the Build completed` 오류가 나면 Vercel Project Settings의 Output Directory가 `public`으로 덮어써진 상태다. `Settings > Build & Development Settings`에서 Framework Preset을 `Next.js`로 바꾸고 Output Directory override를 끄거나 빈 값으로 저장한 뒤 다시 배포한다.
 
@@ -118,7 +122,8 @@ CORS_ORIGINS=https://saju-frontend.vercel.app,https://yourdomain.com
 - `만세력 보러가기`가 정상 응답한다.
 - `심리 리딩 질문 받기`가 질문 5개를 생성한다.
 - `최종 풀이 보기`가 JSON 파싱 오류 없이 결과 화면을 표시한다.
-- `/admin/prompts`는 `ENABLE_ADMIN_PROMPTS=true`가 아니면 404를 반환한다.
+- 오른쪽 위 설정 버튼에서 관리자 비밀번호를 입력하면 `/admin/prompts`로 이동한다.
+- `/admin/prompts`는 백엔드 `ENABLE_ADMIN_PROMPTS=true`와 `ADMIN_API_KEY`가 설정되어 있어야 불러오기/저장이 가능하다.
 - Groq나 자체 제한 한도 초과 시 429 안내 메시지가 표시된다.
 - Render가 잠든 뒤 첫 요청에서 지연이 있어도 프론트 로딩 상태가 유지된다.
 
@@ -128,7 +133,7 @@ CORS_ORIGINS=https://saju-frontend.vercel.app,https://yourdomain.com
 - `502 Bad Gateway`: Groq 응답 실패 또는 JSON schema 검증 실패다. Render logs에서 Groq error body를 확인한다.
 - `504 Gateway Timeout`: LLM 응답 시간이 초과됐다. 필요하면 `GROQ_TIMEOUT_SECONDS=90`으로 올린다.
 - 첫 요청이 느림: Render Free 콜드 스타트로 볼 수 있다.
-- 관리자 프롬프트 수정 불가: 공개 배포에서는 의도적으로 비활성화한 상태다.
+- 관리자 프롬프트 수정 불가: Render의 `ENABLE_ADMIN_PROMPTS=true`, `ADMIN_API_KEY`, `CORS_ORIGINS` 설정을 확인한다.
 
 ## 8. 유료 전환 기준
 

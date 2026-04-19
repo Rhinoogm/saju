@@ -1,17 +1,23 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.config import Settings, get_settings
-from app.services.prompt_builder import FINAL_SYSTEM_PROMPT, QUESTION_SYSTEM_PROMPT
+from app.services.prompt_builder import FINAL_SYSTEM_PROMPT, FINAL_USER_PROMPT_TEMPLATE, QUESTION_SYSTEM_PROMPT, QUESTION_USER_PROMPT_TEMPLATE
 from app.services.prompt_store import PromptRecord, PromptStore
+from app.services.runtime_settings import resolve_runtime_llm_settings, save_runtime_llm_settings
 
 router = APIRouter(prefix="/api/admin/prompts", tags=["admin"])
+settings_router = APIRouter(prefix="/api/admin/settings", tags=["admin"])
 
 DEFAULT_PROMPTS: dict[str, str] = {
     "question_system_prompt": QUESTION_SYSTEM_PROMPT,
+    "question_user_prompt": QUESTION_USER_PROMPT_TEMPLATE,
     "final_system_prompt": FINAL_SYSTEM_PROMPT,
+    "final_user_prompt": FINAL_USER_PROMPT_TEMPLATE,
 }
 
 
@@ -27,6 +33,24 @@ class PromptResponse(BaseModel):
     @staticmethod
     def from_record(record: PromptRecord) -> "PromptResponse":
         return PromptResponse(name=record.name, content=record.content, updated_at=record.updated_at)
+
+
+class LLMSettingsUpdateRequest(BaseModel):
+    llm_provider: Literal["ollama", "groq"]
+    groq_model: str = Field(min_length=1, max_length=200)
+    ollama_model: str = Field(min_length=1, max_length=200)
+
+    @field_validator("groq_model", "ollama_model", mode="before")
+    @classmethod
+    def strip_model_name(cls, value: str) -> str:
+        return value.strip() if isinstance(value, str) else value
+
+
+class LLMSettingsResponse(BaseModel):
+    llm_provider: Literal["ollama", "groq"]
+    groq_model: str
+    ollama_model: str
+    updated_at: dict[str, str]
 
 
 def require_admin(
@@ -72,9 +96,43 @@ async def get_prompt(name: str, store: PromptStore = Depends(get_prompt_store)) 
 
 @router.put("/{name}", response_model=PromptResponse, dependencies=[Depends(require_admin)])
 async def put_prompt(name: str, payload: PromptUpdateRequest, store: PromptStore = Depends(get_prompt_store)) -> PromptResponse:
+    if name not in DEFAULT_PROMPTS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prompt not found")
     content = payload.content.strip()
     if not content:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Prompt content cannot be empty")
     record = store.set_prompt(name, content)
     return PromptResponse.from_record(record)
 
+
+@settings_router.get("/llm", response_model=LLMSettingsResponse, dependencies=[Depends(require_admin)])
+async def get_llm_settings(
+    settings: Settings = Depends(get_settings),
+    store: PromptStore = Depends(get_prompt_store),
+) -> LLMSettingsResponse:
+    runtime_settings = resolve_runtime_llm_settings(settings, store)
+    return LLMSettingsResponse(
+        llm_provider=runtime_settings.llm_provider,
+        groq_model=runtime_settings.groq_model,
+        ollama_model=runtime_settings.ollama_model,
+        updated_at=runtime_settings.updated_at,
+    )
+
+
+@settings_router.put("/llm", response_model=LLMSettingsResponse, dependencies=[Depends(require_admin)])
+async def put_llm_settings(
+    payload: LLMSettingsUpdateRequest,
+    store: PromptStore = Depends(get_prompt_store),
+) -> LLMSettingsResponse:
+    updated_at = save_runtime_llm_settings(
+        store,
+        llm_provider=payload.llm_provider,
+        groq_model=payload.groq_model,
+        ollama_model=payload.ollama_model,
+    )
+    return LLMSettingsResponse(
+        llm_provider=payload.llm_provider,
+        groq_model=payload.groq_model,
+        ollama_model=payload.ollama_model,
+        updated_at=updated_at,
+    )

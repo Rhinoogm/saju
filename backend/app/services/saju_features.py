@@ -177,6 +177,5 @@ def build_daewoon(raw_saju: dict[str, Any], gender: Gender, count: int = 8) -> l
 
 def calculation_note(gender: Gender) -> str:
     if gender == Gender.other:
-        return "대운 방향은 전통 계산식에 필요한 성별 값이 중립/기타로 입력되어 순행 기본값으로 산출했습니다. 대운 시작 나이는 MVP에서 10세 단위 근사값입니다."
-    return "대운 시작 나이는 MVP에서 10세 단위 근사값입니다. 정확한 대운수는 절기 전후 시간 차 계산을 추가해 보정할 수 있습니다."
-
+        return "대운 방향은 전통 계산식에 필요한 성별 값이 중립/기타로 입력되어 순행 기본값으로 산출했습니다. 대운 시작 나이는 10세 단위 참고값입니다."
+    return "대운 시작 나이는 10세 단위 참고값입니다. 정확한 대운수는 절기 전후 시간 차 계산을 추가해 보정할 수 있습니다."
