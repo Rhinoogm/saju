@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from app.config import Settings, get_settings
 from app.api.routes.saju import get_llm_provider
 from app.main import app, create_app
-from app.services.llm.base import LLMResponse
+from app.services.llm.base import LLMRateLimitError, LLMResponse
 from app.services.prompt_store import PromptStore
 from app.services.rate_limiter import InMemoryRateLimiter
 from app.services.runtime_settings import resolve_runtime_llm_settings
@@ -108,6 +108,11 @@ class MockProvider:
 class InvalidJsonProvider:
     async def generate(self, *, system: str, prompt: str, schema: dict, schema_name: str) -> LLMResponse:
         return LLMResponse(content="not json", model="test-model", provider="mock")
+
+
+class RateLimitedProvider:
+    async def generate(self, *, system: str, prompt: str, schema: dict, schema_name: str) -> LLMResponse:
+        raise LLMRateLimitError("Groq API limit reached: token rate limit exceeded (type=rate_limit_error)")
 
 
 class AlwaysInvalidFinalReadingProvider:
@@ -219,6 +224,22 @@ def test_generate_questions_rate_limit() -> None:
     assert first_response.status_code == 200
     assert second_response.status_code == 429
     assert "요청 한도" in second_response.json()["detail"]
+
+
+def test_generate_questions_preserves_provider_rate_limit_detail() -> None:
+    original_limiter = app.state.llm_rate_limiter
+    app.state.llm_rate_limiter = None
+    app.dependency_overrides[get_llm_provider] = lambda: RateLimitedProvider()
+    client = TestClient(app)
+
+    try:
+        response = client.post("/api/generate-questions", json=initial_payload())
+    finally:
+        app.dependency_overrides.clear()
+        app.state.llm_rate_limiter = original_limiter
+
+    assert response.status_code == 429
+    assert response.json()["detail"] == "Groq API limit reached: token rate limit exceeded (type=rate_limit_error)"
 
 
 def test_admin_prompts_router_disabled_when_configured_off(monkeypatch) -> None:

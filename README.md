@@ -42,6 +42,8 @@ LLM_PROVIDER=groq
 GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=llama-3.1-8b-instant
 GROQ_RESPONSE_FORMAT_MODE=auto
+GROQ_MAX_COMPLETION_TOKENS=5000
+GROQ_MAX_REQUEST_TOKENS=6000
 ```
 
 `auto`는 Groq에서 strict JSON Schema를 지원하는 모델(`openai/gpt-oss-20b`, `openai/gpt-oss-120b`)에는 `json_schema`를 사용하고, 그 외 모델에는 `json_object`를 사용합니다. strict schema를 직접 쓰려면 지원 모델로 `GROQ_MODEL`을 바꾸거나 `GROQ_RESPONSE_FORMAT_MODE=json_schema`를 지정하세요.

@@ -100,7 +100,7 @@ async def _call_llm(
     except LLMRateLimitError as exc:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="무료 모델 사용 한도에 도달했어요. 잠시 뒤 다시 시도해주세요.",
+            detail=str(exc) or "무료 모델 사용 한도에 도달했어요. 잠시 뒤 다시 시도해주세요.",
         ) from exc
     except LLMProviderError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc

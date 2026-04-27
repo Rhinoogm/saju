@@ -58,6 +58,7 @@ def test_final_prompt_requests_report_structure(sample_request, sample_saju_data
     assert "deep_sections" in built.prompt
     assert "timing_points" in built.prompt
     assert "진단 질문 답변" in built.prompt
+    assert "출력 예산" in built.prompt
     assert "한 줄의 명쾌한 답" in built.prompt
     assert "사주 용어와 쉬운 번역" in built.prompt
     assert sample_request.initial_concern in built.prompt

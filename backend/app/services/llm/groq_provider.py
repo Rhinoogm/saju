@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import re
+from collections.abc import Awaitable, Callable
 from typing import Any, Literal
 
 import httpx
@@ -10,6 +13,9 @@ from app.services.llm.base import LLMProviderError, LLMRateLimitError, LLMRespon
 _ERROR_BODY_LIMIT = 500
 _TOKEN_BUDGET_BUFFER = 128
 _MIN_COMPLETION_TOKENS = 256
+_MAX_RATE_LIMIT_RETRY_SECONDS = 60.0
+_TPM_LIMIT_PATTERN = re.compile(r"\blimit\s+([0-9][0-9,]*)\b", re.IGNORECASE)
+_TRY_AGAIN_PATTERN = re.compile(r"try again in\s+([0-9]+(?:\.[0-9]+)?)s", re.IGNORECASE)
 _JSON_SCHEMA_RESPONSE_FORMAT = "json_schema"
 _JSON_OBJECT_RESPONSE_FORMAT = "json_object"
 _STRICT_JSON_SCHEMA_MODELS = frozenset(
@@ -38,9 +44,10 @@ class GroqProvider:
         temperature: float = 0.25,
         response_format_mode: Literal["auto", "json_schema", "json_object", "none"] = "auto",
         json_schema_strict: bool = True,
-        max_completion_tokens: int | None = 4096,
-        max_request_tokens: int | None = 8000,
+        max_completion_tokens: int | None = 5000,
+        max_request_tokens: int | None = 6000,
         transport: httpx.AsyncBaseTransport | None = None,
+        sleep: Callable[[float], Awaitable[None]] | None = None,
     ) -> None:
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
@@ -52,6 +59,7 @@ class GroqProvider:
         self.max_completion_tokens = max_completion_tokens
         self.max_request_tokens = max_request_tokens
         self.transport = transport
+        self.sleep = sleep or asyncio.sleep
 
     def _auto_json_schema_strict(self) -> bool | None:
         model = self.model.lower()
@@ -94,6 +102,14 @@ class GroqProvider:
         )
 
     @staticmethod
+    def _prompt_for_json_object(prompt: str, *, schema_name: str) -> str:
+        return (
+            f"{prompt}\n\n"
+            f"반드시 {schema_name} 구조의 JSON 객체만 반환하라. "
+            "마크다운, 코드블록, 설명, 주석은 절대 포함하지 않는다."
+        )
+
+    @staticmethod
     def _estimate_text_tokens(value: str) -> int:
         if not value:
             return 0
@@ -109,17 +125,18 @@ class GroqProvider:
         serialized = json.dumps(payload_without_completion, ensure_ascii=False, separators=(",", ":"))
         return cls._estimate_text_tokens(serialized)
 
-    def _fit_completion_budget(self, payload: dict[str, Any]) -> None:
-        if self.max_completion_tokens is None or self.max_request_tokens is None:
+    def _fit_completion_budget(self, payload: dict[str, Any], *, request_token_budget: int | None = None) -> None:
+        max_request_tokens = self.max_request_tokens if request_token_budget is None else request_token_budget
+        if self.max_completion_tokens is None or max_request_tokens is None:
             return
 
         prompt_tokens = self._estimate_payload_tokens(payload)
-        available_completion_tokens = self.max_request_tokens - prompt_tokens - _TOKEN_BUDGET_BUFFER
+        available_completion_tokens = max_request_tokens - prompt_tokens - _TOKEN_BUDGET_BUFFER
         if available_completion_tokens < _MIN_COMPLETION_TOKENS:
             raise LLMProviderError(
                 "Groq request is too large for the configured token-per-minute budget. "
                 f"Estimated prompt tokens: {prompt_tokens}, "
-                f"GROQ_MAX_REQUEST_TOKENS={self.max_request_tokens}. "
+                f"GROQ_MAX_REQUEST_TOKENS={max_request_tokens}. "
                 "Shorten the prompt or raise GROQ_MAX_REQUEST_TOKENS for a higher Groq tier."
             )
 
@@ -133,6 +150,7 @@ class GroqProvider:
         schema: dict[str, Any],
         schema_name: str,
         response_format: dict[str, Any] | None | object = _DEFAULT_RESPONSE_FORMAT,
+        request_token_budget: int | None = None,
     ) -> dict[str, Any]:
         resolved_response_format = (
             self._response_format(schema=schema, schema_name=schema_name)
@@ -140,7 +158,9 @@ class GroqProvider:
             else response_format
         )
         user_prompt = prompt
-        if not isinstance(resolved_response_format, dict) or resolved_response_format.get("type") != _JSON_SCHEMA_RESPONSE_FORMAT:
+        if isinstance(resolved_response_format, dict) and resolved_response_format.get("type") == _JSON_OBJECT_RESPONSE_FORMAT:
+            user_prompt = self._prompt_for_json_object(prompt, schema_name=schema_name)
+        elif not isinstance(resolved_response_format, dict):
             user_prompt = self._prompt_with_schema(prompt, schema=schema, schema_name=schema_name)
 
         payload: dict[str, Any] = {
@@ -155,7 +175,7 @@ class GroqProvider:
             payload["max_completion_tokens"] = self.max_completion_tokens
         if isinstance(resolved_response_format, dict):
             payload["response_format"] = resolved_response_format
-        self._fit_completion_budget(payload)
+        self._fit_completion_budget(payload, request_token_budget=request_token_budget)
         return payload
 
     @staticmethod
@@ -174,6 +194,85 @@ class GroqProvider:
             or "generated json does not match" in normalized_error
         )
 
+    @staticmethod
+    def _response_error_text(response: httpx.Response) -> str:
+        try:
+            body = response.json()
+        except ValueError:
+            return response.text[:_ERROR_BODY_LIMIT] or "<empty response body>"
+
+        error = body.get("error") if isinstance(body, dict) else None
+        if not isinstance(error, dict):
+            return response.text[:_ERROR_BODY_LIMIT] or "<empty response body>"
+
+        message = error.get("message")
+        details = []
+        for key in ("type", "code", "param"):
+            value = error.get(key)
+            if isinstance(value, str) and value:
+                details.append(f"{key}={value}")
+
+        if isinstance(message, str) and message:
+            if details:
+                return f"{message} ({', '.join(details)})"[:_ERROR_BODY_LIMIT]
+            return message[:_ERROR_BODY_LIMIT]
+
+        return json.dumps(error, ensure_ascii=False, separators=(",", ":"))[:_ERROR_BODY_LIMIT]
+
+    @staticmethod
+    def _is_quota_or_rate_limit_response(status_code: int, error_text: str) -> bool:
+        if status_code == 429:
+            return True
+        if status_code not in {400, 403, 413}:
+            return False
+
+        normalized_error = error_text.lower()
+        return any(
+            marker in normalized_error
+            for marker in (
+                "blocked_api_access",
+                "insufficient_quota",
+                "rate_limit",
+                "rate limit",
+                "spend limit",
+                "tokens per minute",
+                "quota exceeded",
+            )
+        )
+
+    @staticmethod
+    def _rate_limit_error_message(error_text: str, retry_after: str | None) -> str:
+        message = f"Groq API limit reached: {error_text}"
+        if retry_after:
+            message = f"{message} Retry after {retry_after} seconds."
+        return message
+
+    @staticmethod
+    def _retry_after_seconds(retry_after: str | None, error_text: str) -> float | None:
+        if retry_after:
+            try:
+                return max(0.0, float(retry_after))
+            except ValueError:
+                pass
+
+        match = _TRY_AGAIN_PATTERN.search(error_text)
+        if match is None:
+            return None
+        return max(0.0, float(match.group(1)))
+
+    @staticmethod
+    def _request_tpm_limit(status_code: int, error_text: str) -> int | None:
+        if status_code != 413:
+            return None
+        normalized_error = error_text.lower()
+        if "tokens per minute" not in normalized_error and "rate_limit_exceeded" not in normalized_error:
+            return None
+
+        match = _TPM_LIMIT_PATTERN.search(error_text)
+        if match is None:
+            return None
+        return int(match.group(1).replace(",", ""))
+
     async def generate(
         self,
         *,
@@ -191,6 +290,8 @@ class GroqProvider:
             "Content-Type": "application/json",
         }
         attempted_json_object_fallback = False
+        attempted_tpm_budget_fallback = False
+        attempted_rate_limit_wait = False
 
         while True:
             try:
@@ -205,9 +306,34 @@ class GroqProvider:
             except httpx.TimeoutException as exc:
                 raise LLMTimeoutError("Groq request timed out") from exc
             except httpx.HTTPStatusError as exc:
-                error_text = exc.response.text[:_ERROR_BODY_LIMIT]
-                if exc.response.status_code == 429:
-                    raise LLMRateLimitError("Groq free API limit reached. Please try again later.") from exc
+                error_text = self._response_error_text(exc.response)
+                request_tpm_limit = self._request_tpm_limit(exc.response.status_code, error_text)
+                if request_tpm_limit is not None and not attempted_tpm_budget_fallback:
+                    attempted_tpm_budget_fallback = True
+                    payload = self._build_payload(
+                        system=system,
+                        prompt=prompt,
+                        schema=schema,
+                        schema_name=schema_name,
+                        response_format=payload.get("response_format"),
+                        request_token_budget=request_tpm_limit,
+                    )
+                    continue
+                if self._is_quota_or_rate_limit_response(exc.response.status_code, error_text):
+                    retry_after = exc.response.headers.get("Retry-After")
+                    retry_after_seconds = self._retry_after_seconds(retry_after, error_text)
+                    if (
+                        retry_after_seconds is not None
+                        and retry_after_seconds <= _MAX_RATE_LIMIT_RETRY_SECONDS
+                        and not attempted_rate_limit_wait
+                    ):
+                        attempted_rate_limit_wait = True
+                        await self.sleep(retry_after_seconds)
+                        continue
+
+                    raise LLMRateLimitError(
+                        self._rate_limit_error_message(error_text, retry_after)
+                    ) from exc
                 if (
                     self.response_format_mode == "auto"
                     and not attempted_json_object_fallback

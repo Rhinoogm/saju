@@ -50,7 +50,8 @@ GROQ_API_KEY=<your-groq-api-key>
 GROQ_MODEL=openai/gpt-oss-20b
 GROQ_RESPONSE_FORMAT_MODE=auto
 GROQ_JSON_SCHEMA_STRICT=true
-GROQ_MAX_COMPLETION_TOKENS=4096
+GROQ_MAX_COMPLETION_TOKENS=5000
+GROQ_MAX_REQUEST_TOKENS=6000
 GROQ_TIMEOUT_SECONDS=60
 
 ENABLE_ADMIN_PROMPTS=true
@@ -130,6 +131,7 @@ CORS_ORIGINS=https://saju-frontend.vercel.app,https://yourdomain.com
 ## 7. 장애 대응
 
 - `429 Too Many Requests`: 자체 rate limit 또는 Groq Free 한도 초과다. 잠시 뒤 재시도한다.
+- `413 Request Entity Too Large`: Groq의 tokens-per-minute 한도보다 요청이 크다. Free tier에서 `Limit 6000`이 보이면 Render 환경변수 `GROQ_MAX_REQUEST_TOKENS=6000`으로 낮춘 뒤 redeploy한다.
 - `502 Bad Gateway`: Groq 응답 실패 또는 JSON schema 검증 실패다. Render logs에서 Groq error body를 확인한다.
 - `504 Gateway Timeout`: LLM 응답 시간이 초과됐다. 필요하면 `GROQ_TIMEOUT_SECONDS=90`으로 올린다.
 - 첫 요청이 느림: Render Free 콜드 스타트로 볼 수 있다.
