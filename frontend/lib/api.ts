@@ -1,6 +1,8 @@
 export type CalendarType = "solar" | "lunar";
 export type Gender = "male" | "female" | "other";
 export type QuestionType = "single_choice" | "short_text";
+export type ConcernCategory = "romance" | "career" | "finance" | "health" | "academics" | "others";
+export type ReadingStyle = "traditional" | "empathetic" | "direct";
 
 export interface BirthInfo {
   calendar_type: CalendarType;
@@ -88,6 +90,18 @@ export interface ResponseMeta {
 
 export interface GenerateQuestionsResponse {
   saju: SajuData;
+  category: ConcernCategory;
+  category_label: string;
+  questions: DiagnosticQuestion[];
+  meta: ResponseMeta;
+}
+
+export interface GenerateCustomQuestionsRequest extends InitialProfile {
+  category: ConcernCategory;
+  fixed_answers: QuestionAnswer[];
+}
+
+export interface GenerateCustomQuestionsResponse {
   questions: DiagnosticQuestion[];
   meta: ResponseMeta;
 }
@@ -190,7 +204,11 @@ export function generateQuestions(payload: InitialProfile): Promise<GenerateQues
   return postJson<GenerateQuestionsResponse>("/api/generate-questions", payload);
 }
 
-export function requestFinalReading(payload: InitialProfile & { answers: QuestionAnswer[] }): Promise<FinalReadingResponse> {
+export function generateCustomQuestions(payload: GenerateCustomQuestionsRequest): Promise<GenerateCustomQuestionsResponse> {
+  return postJson<GenerateCustomQuestionsResponse>("/api/generate-custom-questions", payload);
+}
+
+export function requestFinalReading(payload: InitialProfile & { category?: ConcernCategory; reading_style?: ReadingStyle; answers: QuestionAnswer[] }): Promise<FinalReadingResponse> {
   return postJson<FinalReadingResponse>("/api/final-reading", payload);
 }
 

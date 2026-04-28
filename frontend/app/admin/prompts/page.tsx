@@ -4,9 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, RefreshCcw, Save, Settings2 } from "lucide-react";
 
-type PromptName = "question_system_prompt" | "question_user_prompt" | "final_system_prompt" | "final_user_prompt";
-type LLMProviderName = "ollama" | "groq";
-type LLMSettingKey = "llm_provider" | "groq_model" | "ollama_model";
+type PromptName =
+  | "question_system_prompt"
+  | "question_user_prompt"
+  | "final_system_prompt_traditional"
+  | "final_system_prompt_empathetic"
+  | "final_system_prompt_direct"
+  | "final_user_prompt";
+type LLMProviderName = "ollama" | "groq" | "gemini";
+type LLMSettingKey = "llm_provider" | "groq_model" | "ollama_model" | "gemini_model";
 
 interface PromptResponse {
   name: PromptName;
@@ -18,6 +24,7 @@ interface LLMSettingsResponse {
   llm_provider: LLMProviderName;
   groq_model: string;
   ollama_model: string;
+  gemini_model: string;
   updated_at: Partial<Record<LLMSettingKey, string>>;
 }
 
@@ -26,21 +33,26 @@ const STORAGE_KEY = "saju_admin_api_key";
 const emptyContent: Record<PromptName, string> = {
   question_system_prompt: "",
   question_user_prompt: "",
-  final_system_prompt: "",
+  final_system_prompt_traditional: "",
+  final_system_prompt_empathetic: "",
+  final_system_prompt_direct: "",
   final_user_prompt: "",
 };
 
 const emptyPromptUpdatedAt: Record<PromptName, string | null> = {
   question_system_prompt: null,
   question_user_prompt: null,
-  final_system_prompt: null,
+  final_system_prompt_traditional: null,
+  final_system_prompt_empathetic: null,
+  final_system_prompt_direct: null,
   final_user_prompt: null,
 };
 
 const defaultLLMSettings: LLMSettingsResponse = {
-  llm_provider: "ollama",
+  llm_provider: "gemini",
   groq_model: "",
   ollama_model: "",
+  gemini_model: "",
   updated_at: {},
 };
 
@@ -107,6 +119,7 @@ async function saveLLMSettings(settings: LLMSettingsResponse, adminKey: string):
       llm_provider: settings.llm_provider,
       groq_model: settings.groq_model,
       ollama_model: settings.ollama_model,
+      gemini_model: settings.gemini_model,
     }),
   });
   return readJson<LLMSettingsResponse>(response, "모델 설정 저장 실패");
@@ -115,9 +128,11 @@ async function saveLLMSettings(settings: LLMSettingsResponse, adminKey: string):
 export default function AdminPromptsPage() {
   const promptNames: { name: PromptName; label: string; description: string }[] = useMemo(
     () => [
-      { name: "question_system_prompt", label: "질문 System", description: "질문 생성 역할과 JSON 출력 규칙" },
-      { name: "question_user_prompt", label: "질문 Prompt", description: "{profile_json}, {saju_json} 사용 가능" },
-      { name: "final_system_prompt", label: "최종 답변 System", description: "최종 리포트 역할과 JSON 출력 규칙" },
+      { name: "question_system_prompt", label: "맞춤 질문 System", description: "맞춤 질문 생성 역할과 JSON 출력 규칙" },
+      { name: "question_user_prompt", label: "맞춤 질문 Prompt", description: "{profile_json}, {category_json}, {fixed_answers_json} 사용 가능" },
+      { name: "final_system_prompt_traditional", label: "정통 사주 System", description: "근본있는 철학관 최종 리포트 역할과 JSON 출력 규칙" },
+      { name: "final_system_prompt_empathetic", label: "공감형 System", description: "과몰입 극F 호소인 최종 리포트 역할과 JSON 출력 규칙" },
+      { name: "final_system_prompt_direct", label: "직설 분석 System", description: "감정 뺀 결과보고서 최종 리포트 역할과 JSON 출력 규칙" },
       { name: "final_user_prompt", label: "최종 답변 Prompt", description: "{profile_json}, {saju_json}, {answers_json} 사용 가능" },
     ],
     [],
@@ -187,7 +202,7 @@ export default function AdminPromptsPage() {
       setError("관리 비밀번호를 입력해주세요.");
       return;
     }
-    if (!llmSettings.groq_model.trim() || !llmSettings.ollama_model.trim()) {
+    if (!llmSettings.groq_model.trim() || !llmSettings.ollama_model.trim() || !llmSettings.gemini_model.trim()) {
       setError("모델 이름을 입력해주세요.");
       return;
     }
@@ -199,6 +214,7 @@ export default function AdminPromptsPage() {
           ...llmSettings,
           groq_model: llmSettings.groq_model.trim(),
           ollama_model: llmSettings.ollama_model.trim(),
+          gemini_model: llmSettings.gemini_model.trim(),
         },
         adminKey.trim(),
       );
@@ -304,7 +320,7 @@ export default function AdminPromptsPage() {
             </button>
           </div>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          <div className="mt-4 grid gap-4 lg:grid-cols-4">
             <label className="block">
               <span className="mb-2 block text-sm font-black text-stone-700">사용 Provider</span>
               <select
@@ -312,6 +328,7 @@ export default function AdminPromptsPage() {
                 onChange={(event) => setLLMSettings((current) => ({ ...current, llm_provider: event.target.value as LLMProviderName }))}
                 className="h-12 w-full rounded-lg border border-stone-200 bg-cloud px-4 text-base font-bold text-ink outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
               >
+                <option value="gemini">Gemini</option>
                 <option value="groq">Groq</option>
                 <option value="ollama">Ollama</option>
               </select>
@@ -327,6 +344,17 @@ export default function AdminPromptsPage() {
                 className="h-12 w-full rounded-lg border border-stone-200 bg-cloud px-4 text-base text-ink outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
               />
               {llmSettings.updated_at.groq_model && <span className="mt-2 block text-xs font-bold text-stone-500">{llmSettings.updated_at.groq_model}</span>}
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-black text-stone-700">Gemini 모델</span>
+              <input
+                value={llmSettings.gemini_model}
+                onChange={(event) => setLLMSettings((current) => ({ ...current, gemini_model: event.target.value }))}
+                placeholder="gemini-2.5-flash"
+                className="h-12 w-full rounded-lg border border-stone-200 bg-cloud px-4 text-base text-ink outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+              />
+              {llmSettings.updated_at.gemini_model && <span className="mt-2 block text-xs font-bold text-stone-500">{llmSettings.updated_at.gemini_model}</span>}
             </label>
 
             <label className="block">

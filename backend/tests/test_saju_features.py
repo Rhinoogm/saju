@@ -1,5 +1,5 @@
-from app.schemas.saju import FinalReadingRequest, Gender
-from app.services.prompt_builder import build_final_reading_prompt, build_question_generation_prompt
+from app.schemas.saju import FinalReadingRequest, GenerateCustomQuestionsRequest, Gender
+from app.services.prompt_builder import build_custom_question_generation_prompt, build_final_reading_prompt
 from app.services.saju_features import build_daewoon, calculation_note, ten_god
 
 
@@ -31,11 +31,37 @@ def test_daewoon_uses_direction_from_gender_and_year_stem() -> None:
     assert [period.pillar for period in backward] == ["癸亥", "壬戌"]
 
 
-def test_prompt_places_initial_concern_before_chart_data(sample_request, sample_saju_data) -> None:
-    built = build_question_generation_prompt(sample_request, sample_saju_data)
+def test_custom_question_prompt_uses_initial_concern_and_fixed_answers(sample_request) -> None:
+    payload = sample_request.model_dump(mode="json")
+    payload["category"] = "career"
+    payload["fixed_answers"] = [
+        {
+            "question_id": "q1",
+            "question": "새롭게 원하는 방향은 어떤 것인가요?",
+            "answer": "지금보다 더 성장할 수 있고 가슴 뛰는 새로운 일을 찾아보고 싶어요",
+            "selected_option_ids": ["D"],
+        },
+        {
+            "question_id": "q2",
+            "question": "이 목표를 향해 어떤 준비를 하고 계신가요?",
+            "answer": "새로운 도전을 위해 이력서를 다듬고 채용 공고를 눈여겨보고 있어요",
+            "selected_option_ids": ["A"],
+        },
+        {
+            "question_id": "q3",
+            "question": "일상에서 가장 크게 달라지길 기대하는 부분은 무엇인가요?",
+            "answer": "내 능력을 온전히 발휘하고 있다는 깊은 성취감",
+            "selected_option_ids": ["C"],
+        },
+    ]
+    built = build_custom_question_generation_prompt(GenerateCustomQuestionsRequest(**payload))
 
-    assert built.prompt.index("사용자 초기 입력") < built.prompt.index("사주 명식 데이터")
+    assert built.prompt.index("사용자 초기 입력") < built.prompt.index("고정 질문 답변")
     assert sample_request.initial_concern in built.prompt
+    assert "직업" in built.prompt
+    assert "내 능력을 온전히 발휘하고 있다는 깊은 성취감" in built.prompt
+    assert "options를 정확히 4개" in built.prompt
+    assert "사주 명식 데이터" not in built.prompt
     assert built.schema_name == "QuestionGenerationOutput"
     assert built.schema["$defs"]["DiagnosticQuestion"]["properties"]["intent_signal"]["minLength"] == 1
 
@@ -49,15 +75,16 @@ def test_final_prompt_requests_report_structure(sample_request, sample_saju_data
             "answer": "조건을 확인하고 움직이고 싶습니다.",
             "selected_option_ids": ["A", "B"],
         }
-        for index in range(1, 6)
+        for index in [1, 2, 3, 5, 6, 7]
     ]
+    payload["category"] = "career"
     built = build_final_reading_prompt(FinalReadingRequest(**payload), sample_saju_data)
 
     assert "프리미엄 최종 사주풀이 리포트" in built.prompt
     assert "summary_cards" in built.prompt
     assert "deep_sections" in built.prompt
     assert "timing_points" in built.prompt
-    assert "진단 질문 답변" in built.prompt
+    assert "고정 질문 및 맞춤형 심층 질문 답변" in built.prompt
     assert "출력 예산" in built.prompt
     assert "한 줄의 명쾌한 답" in built.prompt
     assert "사주 용어와 쉬운 번역" in built.prompt

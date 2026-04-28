@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_name: str = "Saju MVP API"
-    llm_provider: Literal["ollama", "groq"] = "ollama"
+    llm_provider: Literal["ollama", "groq", "gemini"] = "gemini"
     prompts_db_path: str = "./prompts.sqlite3"
     admin_api_key: str | None = None
     enable_admin_prompts: bool = False
@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     groq_json_schema_strict: bool = True
     groq_max_completion_tokens: int = Field(default=5000, ge=256, le=65536)
     groq_max_request_tokens: int | None = Field(default=6000, ge=1024, le=1_000_000)
+
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_api_key: str | None = None
+    gemini_timeout_seconds: float = 60.0
+    gemini_temperature: float = 0.25
+    gemini_response_schema_mode: Literal["json_schema", "json", "none"] = "json_schema"
+    gemini_max_output_tokens: int = Field(default=5000, ge=256, le=65536)
 
     cors_origins: str = Field(default="http://localhost:3000,http://127.0.0.1:3000")
     cors_origin_regex: str | None = (

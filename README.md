@@ -5,7 +5,7 @@
 ## 구조
 
 ```text
-backend/   FastAPI, sajupy 만세력 계산, Groq/Ollama LLM provider, structured prompt
+backend/   FastAPI, sajupy 만세력 계산, Gemini/Groq/Ollama LLM provider, structured prompt
 frontend/  Next.js, Tailwind CSS, 3단계 화면 전환 UI
 ```
 
@@ -26,7 +26,7 @@ python -m pip install -e ".[dev]"
 uvicorn app.main:app --reload --port 8000
 ```
 
-로컬 Ollama 기본값:
+Ollama 사용:
 
 ```bash
 LLM_PROVIDER=ollama
@@ -47,6 +47,18 @@ GROQ_MAX_REQUEST_TOKENS=6000
 ```
 
 `auto`는 Groq에서 strict JSON Schema를 지원하는 모델(`openai/gpt-oss-20b`, `openai/gpt-oss-120b`)에는 `json_schema`를 사용하고, 그 외 모델에는 `json_object`를 사용합니다. strict schema를 직접 쓰려면 지원 모델로 `GROQ_MODEL`을 바꾸거나 `GROQ_RESPONSE_FORMAT_MODE=json_schema`를 지정하세요.
+
+Gemini AI Studio API 사용:
+
+```bash
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_RESPONSE_SCHEMA_MODE=json_schema
+GEMINI_MAX_OUTPUT_TOKENS=5000
+```
+
+Gemini provider는 Google AI Studio의 Gemini API `generateContent` REST endpoint를 호출하며, 기본값으로 `responseMimeType=application/json`과 `responseJsonSchema`를 사용합니다.
 
 ## 프론트엔드 실행
 

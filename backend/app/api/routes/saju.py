@@ -10,18 +10,23 @@ from app.schemas.saju import (
     FinalReadingOutput,
     FinalReadingRequest,
     FinalReadingResponse,
+    GenerateCustomQuestionsRequest,
+    GenerateCustomQuestionsResponse,
     GenerateQuestionsRequest,
     GenerateQuestionsResponse,
+    DiagnosticQuestion,
     QuestionGenerationOutput,
     ResponseMeta,
     SajuOnlyRequest,
     SajuOnlyResponse,
 )
+from app.services.concern_questions import CONCERN_CATEGORY_LABELS, SUBJECTIVE_QUESTION_TEXT, classify_initial_concern, fixed_questions_for_category
 from app.services.calendar_service import CalendarCalculationError, CalendarService
 from app.services.llm.base import LLMProvider, LLMProviderError, LLMRateLimitError, LLMResponse, LLMTimeoutError
+from app.services.llm.gemini_provider import GeminiProvider
 from app.services.llm.groq_provider import GroqProvider
 from app.services.llm.ollama_provider import OllamaProvider
-from app.services.prompt_builder import build_final_reading_prompt, build_question_generation_prompt
+from app.services.prompt_builder import build_custom_question_generation_prompt, build_final_reading_prompt
 from app.services.prompt_store import PromptStore
 from app.services.rate_limiter import enforce_llm_rate_limit
 from app.services.runtime_settings import resolve_runtime_llm_settings
@@ -60,6 +65,17 @@ def get_llm_provider(request: Request, settings: Settings = Depends(get_settings
             json_schema_strict=settings.groq_json_schema_strict,
             max_completion_tokens=settings.groq_max_completion_tokens,
             max_request_tokens=settings.groq_max_request_tokens,
+        )
+
+    if runtime_settings.llm_provider == "gemini":
+        return GeminiProvider(
+            api_key=settings.gemini_api_key,
+            base_url=settings.gemini_base_url,
+            model=runtime_settings.gemini_model,
+            timeout_seconds=settings.gemini_timeout_seconds,
+            temperature=settings.gemini_temperature,
+            response_schema_mode=settings.gemini_response_schema_mode,
+            max_output_tokens=settings.gemini_max_output_tokens,
         )
 
     return OllamaProvider(
@@ -157,20 +173,43 @@ def _invalid_final_reading_http_error(error: LLMInvalidOutputError) -> HTTPExcep
 @router.post(
     "/generate-questions",
     response_model=GenerateQuestionsResponse,
-    dependencies=[Depends(enforce_llm_rate_limit)],
 )
 async def generate_questions(
     payload: GenerateQuestionsRequest,
     calendar_service: CalendarService = Depends(get_calendar_service),
-    llm_provider: LLMProvider = Depends(get_llm_provider),
-    prompt_store: PromptStore | None = Depends(get_prompt_store),
 ) -> GenerateQuestionsResponse:
     try:
         saju = calendar_service.calculate(payload)
     except CalendarCalculationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
-    built_prompt = build_question_generation_prompt(payload, saju, prompt_store=prompt_store)
+    category = classify_initial_concern(payload.initial_concern)
+    questions = fixed_questions_for_category(category)
+
+    return GenerateQuestionsResponse(
+        saju=saju,
+        category=category,
+        category_label=CONCERN_CATEGORY_LABELS[category],
+        questions=questions,
+        meta=ResponseMeta(
+            provider="system",
+            model="fixed-question-bank",
+            raw_metadata={"category": category.value},
+        ),
+    )
+
+
+@router.post(
+    "/generate-custom-questions",
+    response_model=GenerateCustomQuestionsResponse,
+    dependencies=[Depends(enforce_llm_rate_limit)],
+)
+async def generate_custom_questions(
+    payload: GenerateCustomQuestionsRequest,
+    llm_provider: LLMProvider = Depends(get_llm_provider),
+    prompt_store: PromptStore | None = Depends(get_prompt_store),
+) -> GenerateCustomQuestionsResponse:
+    built_prompt = build_custom_question_generation_prompt(payload, prompt_store=prompt_store)
     llm_response = await _call_llm(
         llm_provider,
         system=built_prompt.system,
@@ -179,10 +218,19 @@ async def generate_questions(
         schema_name=built_prompt.schema_name,
     )
     output = _parse_questions(llm_response.content)
+    questions = [
+        *output.questions,
+        DiagnosticQuestion(
+            id="q8",
+            type="short_text",
+            text=SUBJECTIVE_QUESTION_TEXT,
+            options=[],
+            intent_signal="추가 설명",
+        ),
+    ]
 
-    return GenerateQuestionsResponse(
-        saju=saju,
-        questions=output.questions,
+    return GenerateCustomQuestionsResponse(
+        questions=questions,
         meta=_meta(llm_response),
     )
 
