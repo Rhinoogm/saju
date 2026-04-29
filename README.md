@@ -1,6 +1,6 @@
 # 사주 심리 리딩 MVP
 
-사용자의 사주 정보와 초기 고민을 받아 5개의 심리 진단 질문을 생성하고, 그 답변을 사주 명식과 결합해 최종 풀이를 제공하는 2-step LLM 웹 앱입니다.
+사용자의 사주 정보와 초기 고민을 받아 고정 심리 질문과 맞춤 심층 질문을 생성하고, 그 답변을 사주 명식과 결합해 최종 풀이를 제공하는 LLM 웹 앱입니다.
 
 ## 구조
 
@@ -12,9 +12,10 @@ frontend/  Next.js, Tailwind CSS, 3단계 화면 전환 UI
 ## 핵심 흐름
 
 1. 사용자가 이름, 성별, 생년월일시, 초기 고민을 입력합니다.
-2. `POST /api/generate-questions`가 사주 명식을 계산하고 LLM에 structured output으로 질문 5개를 요청합니다.
-3. 프론트엔드가 질문 5개를 표시하고 답변을 수집합니다.
-4. `POST /api/final-reading`이 사주 명식, 초기 고민, 질문 답변을 LLM에 전달해 최종 풀이 JSON을 생성합니다.
+2. `POST /api/generate-questions`가 사주 명식을 계산하고 고정 질문 q1-q3과 선택 서술형 q4를 반환합니다.
+3. `POST /api/generate-custom-questions`가 LLM structured output으로 맞춤 질문 q5-q7을 생성하고 선택 서술형 q8을 붙입니다.
+4. 프론트엔드가 필수 답변 q1, q2, q3, q5, q6, q7과 선택 답변 q4, q8을 수집합니다.
+5. `POST /api/final-reading`이 사주 명식, 초기 고민, 질문 답변을 LLM에 전달해 최종 풀이 JSON을 생성합니다.
 
 ## 백엔드 실행
 
@@ -96,7 +97,7 @@ npm run dev
 }
 ```
 
-응답은 `saju`, `questions`, `meta`를 반환합니다. `questions`는 항상 5개입니다.
+응답은 `saju`, `questions`, `meta`를 반환합니다. `questions`는 고정 질문 q1-q3과 선택 서술형 q4입니다.
 
 ### `POST /api/final-reading`
 
@@ -130,7 +131,7 @@ npm run dev
 }
 ```
 
-실제 요청에서는 `q1`부터 `q5`까지 5개 답변이 필요합니다.
+실제 요청에서는 필수 답변 q1, q2, q3, q5, q6, q7이 필요하며 q4와 q8은 선택입니다.
 
 ## Structured Output
 

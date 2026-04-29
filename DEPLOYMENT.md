@@ -129,7 +129,7 @@ CORS_ORIGINS=https://saju-frontend.vercel.app,https://yourdomain.com
 
 - Vercel 페이지가 열린다.
 - `만세력 보러가기`가 정상 응답한다.
-- `심리 리딩 질문 받기`가 질문 5개를 생성한다.
+- `심리 리딩 질문 받기`가 고정 질문 q1-q3과 선택 q4를 표시하고, 이어서 맞춤 질문 q5-q7과 선택 q8을 생성한다.
 - `최종 풀이 보기`가 JSON 파싱 오류 없이 결과 화면을 표시한다.
 - 오른쪽 위 설정 버튼에서 관리자 비밀번호를 입력하면 `/admin/prompts`로 이동한다.
 - `/admin/prompts`는 백엔드 `ENABLE_ADMIN_PROMPTS=true`와 `ADMIN_API_KEY`가 설정되어 있어야 불러오기/저장이 가능하다.

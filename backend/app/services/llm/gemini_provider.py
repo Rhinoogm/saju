@@ -3,18 +3,27 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+import logging
 from collections.abc import Awaitable, Callable
 from typing import Any, Literal
 from urllib.parse import quote
 
 import httpx
 
-from app.services.llm.base import LLMProviderError, LLMRateLimitError, LLMResponse, LLMTimeoutError
+from app.services.llm.base import (
+    LLMProviderError,
+    LLMRateLimitError,
+    LLMResponse,
+    LLMServiceUnavailableError,
+    LLMTimeoutError,
+)
 
 _ERROR_BODY_LIMIT = 500
 _DEFAULT_TRANSIENT_RETRY_SECONDS = 1.0
 _MAX_TRANSIENT_RETRY_SECONDS = 10.0
 _TRANSIENT_STATUS_CODES = frozenset({500, 502, 503, 504})
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiProvider:
@@ -209,7 +218,10 @@ class GeminiProvider:
     @staticmethod
     def _transient_error_message(error_text: str) -> str:
         if "high demand" in error_text.lower() or "unavailable" in error_text.lower():
-            return "Gemini 모델 사용량이 많아 응답하지 못했어요. 잠시 후 다시 시도해주세요."
+            return (
+                "Gemini 서버가 일시적으로 과부하 상태라 응답하지 못했어요. "
+                "계정 사용량 한도와는 별개일 수 있어요. 잠시 후 다시 시도하거나 다른 Gemini 모델로 바꿔주세요."
+            )
         return "Gemini 모델이 일시적으로 응답하지 못했어요. 잠시 후 다시 시도해주세요."
 
     async def generate(
@@ -254,7 +266,13 @@ class GeminiProvider:
                         transient_retry_count += 1
                         await self.sleep(retry_delay)
                         continue
-                    raise LLMProviderError(self._transient_error_message(error_text)) from exc
+                    logger.warning(
+                        "Gemini transient error after %s retries. status_code=%s error=%s",
+                        transient_retry_count,
+                        exc.response.status_code,
+                        error_text,
+                    )
+                    raise LLMServiceUnavailableError(self._transient_error_message(error_text)) from exc
 
                 raise LLMProviderError(f"Gemini returned HTTP {exc.response.status_code}: {error_text}") from exc
             except httpx.HTTPError as exc:

@@ -23,7 +23,14 @@ from app.schemas.saju import (
 )
 from app.services.concern_questions import CONCERN_CATEGORY_LABELS, SUBJECTIVE_QUESTION_TEXT, classify_initial_concern, fixed_questions_for_category
 from app.services.calendar_service import CalendarCalculationError, CalendarService
-from app.services.llm.base import LLMProvider, LLMProviderError, LLMRateLimitError, LLMResponse, LLMTimeoutError
+from app.services.llm.base import (
+    LLMProvider,
+    LLMProviderError,
+    LLMRateLimitError,
+    LLMResponse,
+    LLMServiceUnavailableError,
+    LLMTimeoutError,
+)
 from app.services.llm.gemini_provider import GeminiProvider
 from app.services.llm.groq_provider import GroqProvider
 from app.services.llm.ollama_provider import OllamaProvider
@@ -121,6 +128,9 @@ async def _call_llm(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=str(exc) or "무료 모델 사용 한도에 도달했어요. 잠시 뒤 다시 시도해주세요.",
         ) from exc
+    except LLMServiceUnavailableError as exc:
+        logger.warning("LLM provider unavailable while generating %s: %s", schema_name, exc)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except LLMProviderError as exc:
         logger.exception("LLM provider failed while generating %s", schema_name)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc

@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from app.services.llm.base import LLMProviderError, LLMRateLimitError
+from app.services.llm.base import LLMProviderError, LLMRateLimitError, LLMServiceUnavailableError
 from app.services.llm.gemini_provider import GeminiProvider
 
 
@@ -165,11 +165,12 @@ async def test_gemini_reports_friendly_error_after_transient_503_retries() -> No
         sleep=sleep,
     )
 
-    with pytest.raises(LLMProviderError) as exc_info:
+    with pytest.raises(LLMServiceUnavailableError) as exc_info:
         await provider.generate(system="system", prompt="prompt", schema={"type": "object"}, schema_name="TestSchema")
 
     assert calls == 2
-    assert str(exc_info.value) == "Gemini 모델 사용량이 많아 응답하지 못했어요. 잠시 후 다시 시도해주세요."
+    assert "계정 사용량 한도와는 별개" in str(exc_info.value)
+    assert "사용량이 많아" not in str(exc_info.value)
 
 
 @pytest.mark.asyncio

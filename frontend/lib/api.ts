@@ -109,7 +109,8 @@ export interface GenerateCustomQuestionsResponse {
 export interface ReadingCareSection {
   title: string;
   headline: string;
-  body: string;
+  summary: string;
+  detail: string;
 }
 
 export interface LuckRecipeItem {

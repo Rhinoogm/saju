@@ -251,7 +251,8 @@ class ReadingCareSection(BaseModel):
 
     title: str = Field(..., min_length=2, max_length=36)
     headline: str = Field(..., min_length=4, max_length=100)
-    body: str = Field(..., min_length=40, max_length=700)
+    summary: str = Field(..., min_length=20, max_length=220)
+    detail: str = Field(..., min_length=200, max_length=1200)
 
 
 class LuckRecipeItem(BaseModel):

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
   ArrowLeft,
   BadgeCheck,
   CalendarClock,
+  ChevronDown,
+  ChevronUp,
   CircleAlert,
   Clock3,
   Copy,
@@ -136,6 +138,8 @@ function CareSection({
   icon: LucideIcon;
   tone: "rose" | "mint" | "honey";
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const detailId = useId();
   const toneClass = {
     rose: "border-[#f0d5dc] bg-[#fff7f8] text-[#7d3f5f]",
     mint: "border-[#cce8e2] bg-[#f4fbf8] text-mint",
@@ -149,7 +153,20 @@ function CareSection({
         {section.title}
       </div>
       <h3 className="text-xl font-black leading-8 text-ink sm:text-2xl">{section.headline}</h3>
-      <p className="mt-3 whitespace-pre-line break-keep text-base font-semibold leading-8 text-stone-700">{section.body}</p>
+      <p className="mt-3 whitespace-pre-line break-keep text-base font-semibold leading-8 text-stone-700">{section.summary}</p>
+      <div id={detailId} hidden={!expanded} className="mt-4 rounded-lg border border-white/70 bg-white/70 px-4 py-4">
+        <p className="whitespace-pre-line break-keep text-base font-semibold leading-8 text-stone-700">{section.detail}</p>
+      </div>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={detailId}
+        onClick={() => setExpanded((current) => !current)}
+        className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-current/20 bg-white/70 px-3 text-sm font-black transition hover:bg-white"
+      >
+        {expanded ? <ChevronUp size={16} aria-hidden /> : <ChevronDown size={16} aria-hidden />}
+        {expanded ? "접기" : "상세 보기"}
+      </button>
     </section>
   );
 }
