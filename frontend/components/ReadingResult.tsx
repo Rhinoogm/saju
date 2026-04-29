@@ -49,11 +49,6 @@ interface ReadingResultProps {
   onRestart: () => void;
 }
 
-function normalizeHashtag(tag: string) {
-  const trimmed = tag.trim();
-  return trimmed.startsWith("#") ? trimmed : `#${trimmed.replace(/\s+/g, "")}`;
-}
-
 function ReportList({ title, items, tone = "light" }: { title: string; items: string[]; tone?: "light" | "warm" }) {
   return (
     <section className={`rounded-lg border p-4 ${tone === "warm" ? "border-[#f0d5dc] bg-[#fff7f8]" : "border-stone-200 bg-white"}`}>
@@ -175,7 +170,7 @@ export function ReadingResult({ result, profileName, onBack, onRestart }: Readin
     `${reading.answer_signals.join(", ")}의 신호가 함께 보입니다. 겉으로는 차분히 판단하려 해도, 속으로는 더 납득되는 기준과 확신을 찾고 있는 흐름입니다.`;
 
   async function copyShareText() {
-    const shareText = [reading.reading_title, reading.core_message, reading.hashtags.map(normalizeHashtag).join(" ")].join("\n");
+    const shareText = [reading.reading_title, reading.core_message].join("\n");
 
     try {
       await navigator.clipboard.writeText(shareText);
@@ -228,14 +223,6 @@ export function ReadingResult({ result, profileName, onBack, onRestart }: Readin
 
         <h2 className="max-w-3xl break-keep text-3xl font-black leading-tight text-ink sm:text-5xl">{reading.reading_title}</h2>
         <p className="mt-4 max-w-3xl break-keep text-xl font-black leading-9 text-berry sm:text-2xl">{reading.core_message}</p>
-
-        <div className="mt-5 flex flex-wrap gap-2">
-          {reading.hashtags.map((tag) => (
-            <span key={tag} className="rounded-lg border border-[#f0d5dc] bg-white px-3 py-2 text-sm font-black text-berry shadow-[0_8px_20px_rgba(125,63,95,0.07)]">
-              {normalizeHashtag(tag)}
-            </span>
-          ))}
-        </div>
       </header>
 
       <CareSection section={reading.situation_mirror} icon={HeartHandshake} tone="rose" />
@@ -263,11 +250,14 @@ export function ReadingResult({ result, profileName, onBack, onRestart }: Readin
         <div className="mb-4 flex items-center gap-2 text-sm font-black text-stone-700">
           <Clock3 size={18} aria-hidden /> 운의 타이밍
         </div>
-        <div className="grid grid-flow-col auto-cols-[minmax(250px,1fr)] gap-3 overflow-x-auto pb-1 lg:grid-flow-row lg:grid-cols-3 lg:overflow-visible lg:pb-0">
+        <div className="grid gap-3">
           {reading.timing_points.map((point, index) => (
-            <div key={`${timingLabels[index] ?? "시기"}-${index}`} className="rounded-lg border border-[#e8ece8] bg-[#fbfcf8] p-4">
-              <p className="text-xs font-black text-mint">{timingLabels[index] ?? "리듬"}</p>
-              <p className="mt-2 break-keep text-base font-black leading-7 text-ink">{point}</p>
+            <div
+              key={`${timingLabels[index] ?? "시기"}-${index}`}
+              className="grid gap-2 rounded-lg border border-[#e8ece8] bg-[#fbfcf8] p-4 sm:grid-cols-[72px_1fr] sm:items-start"
+            >
+              <p className="text-xs font-black leading-7 text-mint">{timingLabels[index] ?? "리듬"}</p>
+              <p className="text-base font-black leading-7 text-ink">{point}</p>
             </div>
           ))}
         </div>
@@ -295,7 +285,7 @@ export function ReadingResult({ result, profileName, onBack, onRestart }: Readin
         <div className="mb-3 flex items-center gap-2 text-sm font-black text-mint">
           <Gem size={18} aria-hidden /> {reading.re_engagement_hook.title}
         </div>
-        <p className="max-w-3xl break-keep text-base font-bold leading-8 text-stone-700">{reading.re_engagement_hook.body}</p>
+        <p className="text-base font-bold leading-8 text-stone-700">{reading.re_engagement_hook.body}</p>
         <button
           type="button"
           onClick={onRestart}

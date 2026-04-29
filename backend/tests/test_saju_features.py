@@ -57,11 +57,11 @@ def test_custom_question_prompt_uses_initial_concern_and_fixed_answers(sample_re
     ]
     built = build_custom_question_generation_prompt(GenerateCustomQuestionsRequest(**payload))
 
-    assert built.prompt.index("사용자 초기 입력") < built.prompt.index("고정 질문 답변")
+    assert built.prompt.index("<user_profile>") < built.prompt.index("<fixed_answers>")
     assert sample_request.initial_concern in built.prompt
     assert "직업" in built.prompt
     assert "내 능력을 온전히 발휘하고 있다는 깊은 성취감" in built.prompt
-    assert "options를 정확히 4개" in built.prompt
+    assert "options는 정확히 4개" in built.prompt
     assert "사주 명식 데이터" not in built.prompt
     assert '"birth"' not in built.prompt
     assert '"selected_option_ids"' not in built.prompt
@@ -84,8 +84,9 @@ def test_final_prompt_requests_report_structure(sample_request, sample_saju_data
     payload["category"] = "career"
     built = build_final_reading_prompt(FinalReadingRequest(**payload), sample_saju_data)
 
-    assert "프리미엄 맞춤형 사주 결과지" in built.prompt
-    assert "hashtags" in built.prompt
+    assert "프리미엄 사주 앱 'Saju-i'" in built.prompt
+    assert "hashtags" not in built.prompt
+    assert "해시태그" not in built.prompt
     assert "situation_mirror" in built.prompt
     assert "saju_insight" in built.prompt
     assert "clear_solution" in built.prompt
@@ -93,17 +94,13 @@ def test_final_prompt_requests_report_structure(sample_request, sample_saju_data
     assert "saju_vibe" in built.prompt
     assert "luck_recipe" in built.prompt
     assert "전문가 데이터" in built.prompt
-    assert "행운의 레시피" in built.prompt
+    assert "감성 레시피" in built.prompt
     assert "timing_points" in built.prompt
-    assert "고정 질문 및 맞춤 심층 질문 답변" in built.prompt
-    assert "출력 예산" in built.prompt
-    assert "감정 과잉 및 바이어스" in built.prompt
-    assert "지금 마음이 향하는 곳" in built.prompt
+    assert "<qna_data>" in built.prompt
+    assert "<budget_and_quality_control>" in built.prompt
+    assert "데이터 격리(Anti-Anchoring)" in built.prompt
     assert "answer_signal_summary" in built.prompt
-    assert "지금 필요한 선택" in built.prompt
-    assert "타고난 결" in built.prompt
-    assert "강점으로 바뀌는 지점" in built.prompt
-    assert "다음엔 이런 것도 궁금해질 거예요" in built.prompt
+    assert "secret_talent" in built.prompt
     assert sample_request.initial_concern in built.prompt
     assert built.schema_name == "FinalReadingOutput"
     assert "situation_mirror" in built.schema["properties"]
@@ -112,6 +109,7 @@ def test_final_prompt_requests_report_structure(sample_request, sample_saju_data
     assert "re_engagement_hook" in built.schema["properties"]
     assert "luck_recipe" in built.schema["properties"]
     assert "answer_signal_summary" in built.schema["properties"]
+    assert "hashtags" not in built.schema["properties"]
     assert "calculation_note" not in built.prompt
     assert '"birth"' not in built.prompt
     assert '"selected_option_ids"' not in built.prompt

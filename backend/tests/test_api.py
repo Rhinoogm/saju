@@ -57,7 +57,6 @@ CUSTOM_QUESTION_PAYLOAD = {
 FINAL_PAYLOAD = {
     "reading_title": "전환 앞에 선 마음의 나침반",
     "core_message": "이직은 서두르지 말고, 성장 조건이 맞을 때 움직이는 쪽이 맞습니다.",
-    "hashtags": ["#성장갈림길", "#조건확인", "#준비된전환", "#나를위한선택"],
     "situation_mirror": {
         "title": "지금 마음이 향하는 곳",
         "headline": "성장 욕구와 안정 확인이 동시에 켜져 있습니다.",
@@ -92,10 +91,10 @@ FINAL_PAYLOAD = {
         "1-3개월 사이에는 실제 제안과 현재 자리의 회복 가능성을 비교하세요. 대운 흐름은 준비된 이동에 더 힘을 실어줍니다.",
     ],
     "luck_recipe": [
-        {"category": "컬러", "item": "딥 민트", "reason": "과열된 책임감을 식히고 차분히 기준을 세우는 감각을 돕습니다."},
-        {"category": "음식", "item": "따뜻한 보리차", "reason": "속도를 낮추고 몸의 긴장을 풀어 결정 피로를 덜어줍니다."},
-        {"category": "작은 습관", "item": "퇴근 후 10분 조건표 쓰기", "reason": "흩어진 걱정을 눈에 보이는 선택 기준으로 바꿔줍니다."},
-        {"category": "아이템", "item": "작은 체크 노트", "reason": "머릿속 계산을 밖으로 꺼내 현실적인 확신을 쌓게 합니다."},
+        {"category": "컬러", "item": "딥 민트", "reason": "표현 욕구가 쉽게 달아오르는 흐름이라 차분한 색이 기준을 세우는 감각을 돕습니다."},
+        {"category": "음식", "item": "따뜻한 보리차", "reason": "생각이 몸보다 앞서기 쉬운 결이라 따뜻한 차가 속도를 낮추고 긴장을 풀어줍니다."},
+        {"category": "작은 습관", "item": "퇴근 후 10분 조건표 쓰기", "reason": "안정 확인이 중요한 명식이라 걱정을 눈에 보이는 선택 기준으로 바꾸는 일이 필요합니다."},
+        {"category": "아이템", "item": "작은 체크 노트", "reason": "현실 조건을 따지는 힘이 강하니 계산을 밖으로 꺼낼수록 확신이 쌓입니다."},
     ],
     "re_engagement_hook": {
         "title": "다음엔 이런 것도 궁금해질 거예요",
@@ -453,7 +452,6 @@ def test_final_reading_happy_path() -> None:
     assert body["reading"]["saju_vibe"]["title"] == "타고난 결"
     assert body["reading"]["secret_talent"]["title"] == "강점으로 바뀌는 지점"
     assert body["reading"]["re_engagement_hook"]["title"] == "다음엔 이런 것도 궁금해질 거예요"
-    assert len(body["reading"]["hashtags"]) == 4
     assert "조건 개선 욕구" in body["reading"]["answer_signal_summary"]
     assert len(body["reading"]["luck_recipe"]) == 4
     assert len(body["reading"]["saju_basis"]) == 3
@@ -494,8 +492,8 @@ def test_final_reading_routes_reading_style_system_prompt() -> None:
 
     systems = [call["system"] for call in provider.calls]
     assert "프리미엄 명리 심리 상담가" in systems[0]
-    assert "오지랖 넓은 푼수이자 영혼의 단짝" in systems[1]
-    assert "시니컬한 전략 분석가" in systems[2]
+    assert "극F 성향의 사주 과몰입 찐 언니" in systems[1]
+    assert "싸가지 없는 천재 명리학자" in systems[2]
 
 
 def test_final_reading_reports_schema_validation_details() -> None:

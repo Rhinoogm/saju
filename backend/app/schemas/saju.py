@@ -267,7 +267,6 @@ class FinalReadingOutput(BaseModel):
 
     reading_title: str = Field(..., min_length=4, max_length=80)
     core_message: str = Field(..., min_length=8, max_length=120)
-    hashtags: list[str] = Field(..., min_length=3, max_length=5)
     situation_mirror: ReadingCareSection
     saju_insight: ReadingCareSection
     clear_solution: ReadingCareSection

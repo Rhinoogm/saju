@@ -121,7 +121,6 @@ export interface LuckRecipeItem {
 export interface FinalReading {
   reading_title: string;
   core_message: string;
-  hashtags: string[];
   situation_mirror: ReadingCareSection;
   saju_insight: ReadingCareSection;
   clear_solution: ReadingCareSection;

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import ValidationError
@@ -32,6 +33,7 @@ from app.services.rate_limiter import enforce_llm_rate_limit
 from app.services.runtime_settings import resolve_runtime_llm_settings
 
 router = APIRouter(prefix="/api", tags=["saju"])
+logger = logging.getLogger(__name__)
 
 
 class LLMInvalidOutputError(ValueError):
@@ -114,11 +116,13 @@ async def _call_llm(
     except LLMTimeoutError as exc:
         raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=str(exc)) from exc
     except LLMRateLimitError as exc:
+        logger.warning("LLM rate limit while generating %s: %s", schema_name, exc)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=str(exc) or "무료 모델 사용 한도에 도달했어요. 잠시 뒤 다시 시도해주세요.",
         ) from exc
     except LLMProviderError as exc:
+        logger.exception("LLM provider failed while generating %s", schema_name)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
@@ -159,6 +163,13 @@ def _parse_final_reading(content: str) -> FinalReadingOutput:
 
 def _invalid_final_reading_http_error(error: LLMInvalidOutputError) -> HTTPException:
     details = "; ".join(error.details[:8]) if error.details else error.reason
+    logger.warning(
+        "Invalid final reading output from LLM. label=%s reason=%s details=%s partial_response=%r",
+        error.label,
+        error.reason,
+        details,
+        error.content[:1000],
+    )
     return HTTPException(
         status_code=status.HTTP_502_BAD_GATEWAY,
         detail=(
