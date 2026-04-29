@@ -6,12 +6,7 @@ from app.config import Settings, get_settings
 from app.api.routes.saju import get_llm_provider
 from app.main import app, create_app
 from app.services.llm.base import LLMRateLimitError, LLMResponse
-from app.services.prompt_builder import (
-    FINAL_USER_PROMPT_TEMPLATE,
-    LEGACY_FINAL_USER_PROMPT_TEMPLATE,
-    PREVIOUS_FINAL_USER_PROMPT_TEMPLATE,
-    STORED_FINAL_USER_PROMPT_TEMPLATE_V1,
-)
+from app.services.prompt_builder import FINAL_USER_PROMPT_TEMPLATE
 from app.services.prompt_store import PromptStore
 from app.services.rate_limiter import InMemoryRateLimiter
 from app.services.runtime_settings import resolve_runtime_llm_settings
@@ -64,7 +59,7 @@ FINAL_PAYLOAD = {
     "core_message": "이직은 서두르지 말고, 성장 조건이 맞을 때 움직이는 쪽이 맞습니다.",
     "hashtags": ["#성장갈림길", "#조건확인", "#준비된전환", "#나를위한선택"],
     "situation_mirror": {
-        "title": "당신의 현재 주파수",
+        "title": "지금 마음이 향하는 곳",
         "headline": "성장 욕구와 안정 확인이 동시에 켜져 있습니다.",
         "body": "새로운 일을 찾아보고 싶다는 답은 지금의 자리를 단순히 벗어나고 싶은 마음만은 아닙니다. 이력서를 다듬고 공고를 살피는 선택에는 가능성을 현실로 확인하려는 태도가 담겨 있습니다. 결국 당신은 무작정 뛰는 사람이 아니라, 내 능력이 온전히 쓰일 조건을 찾고 있습니다.",
     },
@@ -74,23 +69,28 @@ FINAL_PAYLOAD = {
         "body": "명식에는 더 넓은 역할을 탐색하려는 흐름과 안정된 기준을 확인하려는 흐름이 함께 보입니다. 그래서 지금의 고민은 변덕이 아니라, 성장할 자리와 감당할 조건을 동시에 재는 과정입니다. 대운의 흐름도 준비된 이동에는 힘을 실어주지만, 감정만 앞선 선택에는 부담을 남깁니다.",
     },
     "clear_solution": {
-        "title": "명쾌한 처방전",
+        "title": "지금 필요한 선택",
         "headline": "지원은 시작하되, 퇴사는 제안서와 조건표가 나온 뒤입니다.",
         "body": "지금 해야 할 일은 회사를 박차고 나가는 게 아니라 선택지를 실제로 꺼내 놓는 것입니다. 성장 가능성, 보상, 회복 리듬을 표로 나누고 세 조건 중 두 개 이상 맞는 곳만 진지하게 보세요. 제안이 오기 전까지는 현재 자리를 협상 카드로 남겨두는 쪽이 훨씬 유리합니다.",
     },
     "saju_vibe": {
-        "title": "나만의 고유한 바이브",
+        "title": "타고난 결",
         "headline": "차가운 흙 위에서 방향을 고르는 단단한 새싹 같은 사람",
         "body": "당신의 매력은 급하게 피어나는 화려함보다, 방향을 정하면 꾸준히 뿌리내리는 힘에 있습니다. 납득되는 기준을 찾을 때 표정과 말의 결이 가장 선명해집니다.",
     },
     "secret_talent": {
-        "title": "숨겨진 무기",
+        "title": "강점으로 바뀌는 지점",
         "headline": "망설임은 사실 리스크를 먼저 보는 기획력입니다.",
         "body": "스스로는 우유부단하다고 느낄 수 있지만, 지금의 망설임은 중요한 선택을 대충 넘기지 않는 감각입니다. 이 힘을 조건표와 일정으로 바꾸면 다음 선택을 설득력 있게 만드는 무기가 됩니다.",
     },
     "answer_signals": ["조건 개선 욕구", "인정 욕구", "안전 확인 욕구"],
+    "answer_signal_summary": "조건 개선 욕구와 인정 욕구, 안전 확인 욕구가 함께 보여서, 지금은 무작정 변화를 택하기보다 납득되는 기준을 확인해야 마음이 놓이는 흐름입니다.",
     "saju_basis": ["월주 흐름에서 환경 변화 압박이 보입니다.", "오행 균형상 표현 욕구가 막히면 답답함이 커집니다.", "대운 흐름은 준비된 이동에 유리합니다."],
-    "timing_points": ["앞으로 2주는 마음을 다그치기보다 이직 조건표를 만드는 데 쓰세요.", "한 달 안에는 지원할 역할과 포기할 조건을 분리해 기준을 좁히세요.", "1-3개월 사이에는 실제 제안과 현재 자리의 회복 가능성을 나란히 비교하세요."],
+    "timing_points": [
+        "앞으로 2주는 마음을 다그치기보다 조건표를 만드세요. 기준을 중시하는 명식 흐름이 정리될수록 힘을 얻습니다.",
+        "한 달 안에는 지원할 역할과 포기할 조건을 나누세요. 성장 욕구와 안정 확인이 함께 움직이는 타입이라 기준이 필요합니다.",
+        "1-3개월 사이에는 실제 제안과 현재 자리의 회복 가능성을 비교하세요. 대운 흐름은 준비된 이동에 더 힘을 실어줍니다.",
+    ],
     "luck_recipe": [
         {"category": "컬러", "item": "딥 민트", "reason": "과열된 책임감을 식히고 차분히 기준을 세우는 감각을 돕습니다."},
         {"category": "음식", "item": "따뜻한 보리차", "reason": "속도를 낮추고 몸의 긴장을 풀어 결정 피로를 덜어줍니다."},
@@ -140,7 +140,7 @@ class AlwaysInvalidFinalReadingProvider:
 
     async def generate(self, *, system: str, prompt: str, schema: dict, schema_name: str) -> LLMResponse:
         self.calls += 1
-        return LLMResponse(content='{"reading_title":"끊긴 응답","final_text":"중간에서', model="test-model", provider="mock")
+        return LLMResponse(content='{"reading_title":"끊긴 응답","situation_mirror":{"title":"중간에서', model="test-model", provider="mock")
 
 
 class SchemaInvalidFinalReadingProvider:
@@ -314,52 +314,7 @@ def test_admin_prompts_include_reading_style_system_prompts(monkeypatch, tmp_pat
     assert "final_system_prompt" not in prompt_names
 
 
-def test_admin_prompt_migration_replaces_legacy_final_user_prompt(monkeypatch, tmp_path) -> None:
-    db_path = tmp_path / "prompts.sqlite3"
-    store = PromptStore(str(db_path))
-    store.init()
-    store.set_prompt("final_user_prompt", LEGACY_FINAL_USER_PROMPT_TEMPLATE.strip())
-    monkeypatch.setenv("ENABLE_ADMIN_PROMPTS", "true")
-    monkeypatch.setenv("ADMIN_API_KEY", "secret")
-    monkeypatch.setenv("PROMPTS_DB_PATH", str(db_path))
-    get_settings.cache_clear()
-
-    try:
-        enabled_app = create_app()
-        client = TestClient(enabled_app)
-
-        response = client.get("/api/admin/prompts/final_user_prompt", headers={"X-Admin-Key": "secret"})
-    finally:
-        get_settings.cache_clear()
-
-    assert response.status_code == 200
-    assert response.json()["content"] == FINAL_USER_PROMPT_TEMPLATE
-
-
-def test_admin_prompt_migration_replaces_previous_default_final_user_prompts(monkeypatch, tmp_path) -> None:
-    for index, previous_prompt in enumerate([PREVIOUS_FINAL_USER_PROMPT_TEMPLATE, STORED_FINAL_USER_PROMPT_TEMPLATE_V1]):
-        db_path = tmp_path / f"prompts-{index}.sqlite3"
-        store = PromptStore(str(db_path))
-        store.init()
-        store.set_prompt("final_user_prompt", previous_prompt.strip())
-        monkeypatch.setenv("ENABLE_ADMIN_PROMPTS", "true")
-        monkeypatch.setenv("ADMIN_API_KEY", "secret")
-        monkeypatch.setenv("PROMPTS_DB_PATH", str(db_path))
-        get_settings.cache_clear()
-
-        try:
-            enabled_app = create_app()
-            client = TestClient(enabled_app)
-
-            response = client.get("/api/admin/prompts/final_user_prompt", headers={"X-Admin-Key": "secret"})
-        finally:
-            get_settings.cache_clear()
-
-        assert response.status_code == 200
-        assert response.json()["content"] == FINAL_USER_PROMPT_TEMPLATE
-
-
-def test_admin_prompt_migration_keeps_custom_final_user_prompt(monkeypatch, tmp_path) -> None:
+def test_admin_prompt_keeps_custom_final_user_prompt(monkeypatch, tmp_path) -> None:
     custom_prompt = "사용자가 직접 작성한 최종 프롬프트"
     db_path = tmp_path / "prompts.sqlite3"
     store = PromptStore(str(db_path))
@@ -492,11 +447,14 @@ def test_final_reading_happy_path() -> None:
     body = response.json()
     assert body["reading"]["core_message"].startswith("이직은")
     assert body["reading"]["reading_title"] == "전환 앞에 선 마음의 나침반"
-    assert body["reading"]["situation_mirror"]["title"] == "당신의 현재 주파수"
+    assert body["reading"]["situation_mirror"]["title"] == "지금 마음이 향하는 곳"
     assert body["reading"]["saju_insight"]["title"] == "이 고민이 찾아온 이유"
-    assert body["reading"]["clear_solution"]["title"] == "명쾌한 처방전"
+    assert body["reading"]["clear_solution"]["title"] == "지금 필요한 선택"
+    assert body["reading"]["saju_vibe"]["title"] == "타고난 결"
+    assert body["reading"]["secret_talent"]["title"] == "강점으로 바뀌는 지점"
     assert body["reading"]["re_engagement_hook"]["title"] == "다음엔 이런 것도 궁금해질 거예요"
     assert len(body["reading"]["hashtags"]) == 4
+    assert "조건 개선 욕구" in body["reading"]["answer_signal_summary"]
     assert len(body["reading"]["luck_recipe"]) == 4
     assert len(body["reading"]["saju_basis"]) == 3
     assert len(body["reading"]["timing_points"]) == 3

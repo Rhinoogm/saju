@@ -239,14 +239,6 @@ class FinalReadingRequest(InitialProfile):
         return self
 
 
-class ReadingInsightCard(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    title: str = Field(..., min_length=2, max_length=30)
-    headline: str = Field(..., min_length=4, max_length=80)
-    body: str = Field(..., min_length=20, max_length=240)
-
-
 class ReadingSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -282,6 +274,7 @@ class FinalReadingOutput(BaseModel):
     saju_vibe: ReadingCareSection
     secret_talent: ReadingCareSection
     answer_signals: list[str] = Field(..., min_length=3, max_length=5)
+    answer_signal_summary: str = Field(..., min_length=30, max_length=180)
     saju_basis: list[str] = Field(..., min_length=3, max_length=5)
     timing_points: list[str] = Field(..., min_length=3, max_length=3)
     luck_recipe: list[LuckRecipeItem] = Field(..., min_length=4, max_length=4)

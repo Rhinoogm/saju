@@ -170,6 +170,9 @@ export function ReadingResult({ result, profileName, onBack, onRestart }: Readin
   const { reading, saju, meta } = result;
   const [copied, setCopied] = useState(false);
   const trimmedName = profileName.trim() || "고객";
+  const answerSignalSummary =
+    reading.answer_signal_summary ||
+    `${reading.answer_signals.join(", ")}의 신호가 함께 보입니다. 겉으로는 차분히 판단하려 해도, 속으로는 더 납득되는 기준과 확신을 찾고 있는 흐름입니다.`;
 
   async function copyShareText() {
     const shareText = [reading.reading_title, reading.core_message, reading.hashtags.map(normalizeHashtag).join(" ")].join("\n");
@@ -235,38 +238,32 @@ export function ReadingResult({ result, profileName, onBack, onRestart }: Readin
         </div>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-[1.35fr_0.9fr]">
-        <CareSection section={reading.situation_mirror} icon={HeartHandshake} tone="rose" />
+      <CareSection section={reading.situation_mirror} icon={HeartHandshake} tone="rose" />
 
-        <section className="rounded-lg border border-[#eadfce] bg-white p-4 shadow-[0_14px_36px_rgba(83,64,42,0.06)] sm:p-5">
-          <div className="mb-3 flex items-center gap-2 text-sm font-black text-stone-700">
-            <Star size={17} aria-hidden /> 답변에서 읽힌 신호
-          </div>
-          <div className="grid gap-2">
-            {reading.answer_signals.map((signal) => (
-              <div key={signal} className="rounded-lg bg-[#f7f8f5] px-4 py-3 text-sm font-black leading-6 text-ink">
-                {signal}
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
+      <section className="rounded-lg border border-[#eadfce] bg-white p-5 shadow-[0_14px_36px_rgba(83,64,42,0.06)] sm:p-6">
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm font-black text-stone-700">
+          <Star size={17} aria-hidden /> 답변에서 읽힌 신호
+        </div>
+        <div className="rounded-lg bg-[#f7f8f5] px-4 py-4 text-base font-black leading-7 text-ink sm:px-5">{answerSignalSummary}</div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {reading.answer_signals.map((signal) => (
+            <span key={signal} className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-black text-stone-600">
+              {signal}
+            </span>
+          ))}
+        </div>
+      </section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <CareSection section={reading.saju_insight} icon={Star} tone="mint" />
-        <CareSection section={reading.clear_solution} icon={ShieldCheck} tone="honey" />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <CareSection section={reading.saju_vibe} icon={Leaf} tone="mint" />
-        <CareSection section={reading.secret_talent} icon={ShieldCheck} tone="honey" />
-      </div>
+      <CareSection section={reading.saju_insight} icon={Star} tone="mint" />
+      <CareSection section={reading.clear_solution} icon={ShieldCheck} tone="honey" />
+      <CareSection section={reading.saju_vibe} icon={Leaf} tone="mint" />
+      <CareSection section={reading.secret_talent} icon={ShieldCheck} tone="honey" />
 
       <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-[0_14px_36px_rgba(83,64,42,0.06)] sm:p-6">
         <div className="mb-4 flex items-center gap-2 text-sm font-black text-stone-700">
           <Clock3 size={18} aria-hidden /> 운의 타이밍
         </div>
-        <div className="grid gap-3 lg:grid-cols-3">
+        <div className="grid grid-flow-col auto-cols-[minmax(250px,1fr)] gap-3 overflow-x-auto pb-1 lg:grid-flow-row lg:grid-cols-3 lg:overflow-visible lg:pb-0">
           {reading.timing_points.map((point, index) => (
             <div key={`${timingLabels[index] ?? "시기"}-${index}`} className="rounded-lg border border-[#e8ece8] bg-[#fbfcf8] p-4">
               <p className="text-xs font-black text-mint">{timingLabels[index] ?? "리듬"}</p>
@@ -280,7 +277,7 @@ export function ReadingResult({ result, profileName, onBack, onRestart }: Readin
         <div className="mb-4 flex items-center gap-2 text-sm font-black text-[#8a6115]">
           <Sparkles size={18} aria-hidden /> 행운의 레시피
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-flow-col auto-cols-[minmax(230px,1fr)] gap-3 overflow-x-auto pb-1 lg:grid-flow-row lg:grid-cols-4 lg:overflow-visible lg:pb-0">
           {reading.luck_recipe.map((item) => (
             <div key={`${item.category}-${item.item}`} className="rounded-lg border border-[#f0dfc4] bg-white p-4">
               <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[#fff3c9] text-[#8a6115]">

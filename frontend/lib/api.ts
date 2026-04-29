@@ -106,17 +106,6 @@ export interface GenerateCustomQuestionsResponse {
   meta: ResponseMeta;
 }
 
-export interface ReadingInsightCard {
-  title: string;
-  headline: string;
-  body: string;
-}
-
-export interface ReadingSection {
-  title: string;
-  body: string;
-}
-
 export interface ReadingCareSection {
   title: string;
   headline: string;
@@ -139,6 +128,7 @@ export interface FinalReading {
   saju_vibe: ReadingCareSection;
   secret_talent: ReadingCareSection;
   answer_signals: string[];
+  answer_signal_summary: string;
   saju_basis: string[];
   timing_points: string[];
   luck_recipe: LuckRecipeItem[];

@@ -40,6 +40,7 @@ def test_custom_question_prompt_uses_initial_concern_and_fixed_answers(sample_re
             "question": "새롭게 원하는 방향은 어떤 것인가요?",
             "answer": "지금보다 더 성장할 수 있고 가슴 뛰는 새로운 일을 찾아보고 싶어요",
             "selected_option_ids": ["D"],
+            "selected_option_id": "D",
         },
         {
             "question_id": "q2",
@@ -62,6 +63,9 @@ def test_custom_question_prompt_uses_initial_concern_and_fixed_answers(sample_re
     assert "내 능력을 온전히 발휘하고 있다는 깊은 성취감" in built.prompt
     assert "options를 정확히 4개" in built.prompt
     assert "사주 명식 데이터" not in built.prompt
+    assert '"birth"' not in built.prompt
+    assert '"selected_option_ids"' not in built.prompt
+    assert '"selected_option_id"' not in built.prompt
     assert built.schema_name == "QuestionGenerationOutput"
     assert built.schema["$defs"]["DiagnosticQuestion"]["properties"]["intent_signal"]["minLength"] == 1
 
@@ -94,8 +98,11 @@ def test_final_prompt_requests_report_structure(sample_request, sample_saju_data
     assert "고정 질문 및 맞춤 심층 질문 답변" in built.prompt
     assert "출력 예산" in built.prompt
     assert "감정 과잉 및 바이어스" in built.prompt
-    assert "당신의 현재 주파수" in built.prompt
-    assert "명쾌한 처방전" in built.prompt
+    assert "지금 마음이 향하는 곳" in built.prompt
+    assert "answer_signal_summary" in built.prompt
+    assert "지금 필요한 선택" in built.prompt
+    assert "타고난 결" in built.prompt
+    assert "강점으로 바뀌는 지점" in built.prompt
     assert "다음엔 이런 것도 궁금해질 거예요" in built.prompt
     assert sample_request.initial_concern in built.prompt
     assert built.schema_name == "FinalReadingOutput"
@@ -104,8 +111,11 @@ def test_final_prompt_requests_report_structure(sample_request, sample_saju_data
     assert "clear_solution" in built.schema["properties"]
     assert "re_engagement_hook" in built.schema["properties"]
     assert "luck_recipe" in built.schema["properties"]
-    assert "final_text" not in built.schema["properties"]
+    assert "answer_signal_summary" in built.schema["properties"]
     assert "calculation_note" not in built.prompt
+    assert '"birth"' not in built.prompt
+    assert '"selected_option_ids"' not in built.prompt
+    assert '"selected_option_id"' not in built.prompt
     assert "MVP" not in built.prompt
 
 

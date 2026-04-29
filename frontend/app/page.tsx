@@ -71,7 +71,7 @@ const defaultProfile: InitialProfile = {
     is_leap_month: false,
     city: "Seoul",
     longitude: null,
-    use_solar_time: true,
+    use_solar_time: false,
   },
 };
 
