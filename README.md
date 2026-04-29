@@ -1,20 +1,21 @@
 # 사주 심리 리딩 MVP
 
-사용자의 사주 정보와 초기 고민을 받아 5개의 심리 진단 질문을 생성하고, 그 답변을 사주 명식과 결합해 최종 풀이를 제공하는 2-step LLM 웹 앱입니다.
+사용자의 사주 정보와 초기 고민을 받아 고정 심리 질문과 맞춤 심층 질문을 생성하고, 그 답변을 사주 명식과 결합해 최종 풀이를 제공하는 LLM 웹 앱입니다.
 
 ## 구조
 
 ```text
-backend/   FastAPI, sajupy 만세력 계산, Groq/Ollama LLM provider, structured prompt
+backend/   FastAPI, sajupy 만세력 계산, Gemini/Groq/Ollama LLM provider, structured prompt
 frontend/  Next.js, Tailwind CSS, 3단계 화면 전환 UI
 ```
 
 ## 핵심 흐름
 
 1. 사용자가 이름, 성별, 생년월일시, 초기 고민을 입력합니다.
-2. `POST /api/generate-questions`가 사주 명식을 계산하고 LLM에 structured output으로 질문 5개를 요청합니다.
-3. 프론트엔드가 질문 5개를 표시하고 답변을 수집합니다.
-4. `POST /api/final-reading`이 사주 명식, 초기 고민, 질문 답변을 LLM에 전달해 최종 풀이 JSON을 생성합니다.
+2. `POST /api/generate-questions`가 사주 명식을 계산하고 고정 질문 q1-q3과 선택 서술형 q4를 반환합니다.
+3. `POST /api/generate-custom-questions`가 LLM structured output으로 맞춤 질문 q5-q7을 생성하고 선택 서술형 q8을 붙입니다.
+4. 프론트엔드가 필수 답변 q1, q2, q3, q5, q6, q7과 선택 답변 q4, q8을 수집합니다.
+5. `POST /api/final-reading`이 사주 명식, 초기 고민, 질문 답변을 LLM에 전달해 최종 풀이 JSON을 생성합니다.
 
 ## 백엔드 실행
 
@@ -26,7 +27,7 @@ python -m pip install -e ".[dev]"
 uvicorn app.main:app --reload --port 8000
 ```
 
-로컬 Ollama 기본값:
+Ollama 사용:
 
 ```bash
 LLM_PROVIDER=ollama
@@ -42,9 +43,23 @@ LLM_PROVIDER=groq
 GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=llama-3.1-8b-instant
 GROQ_RESPONSE_FORMAT_MODE=auto
+GROQ_MAX_COMPLETION_TOKENS=5000
+GROQ_MAX_REQUEST_TOKENS=6000
 ```
 
 `auto`는 Groq에서 strict JSON Schema를 지원하는 모델(`openai/gpt-oss-20b`, `openai/gpt-oss-120b`)에는 `json_schema`를 사용하고, 그 외 모델에는 `json_object`를 사용합니다. strict schema를 직접 쓰려면 지원 모델로 `GROQ_MODEL`을 바꾸거나 `GROQ_RESPONSE_FORMAT_MODE=json_schema`를 지정하세요.
+
+Gemini AI Studio API 사용:
+
+```bash
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_RESPONSE_SCHEMA_MODE=json_schema
+GEMINI_MAX_OUTPUT_TOKENS=5000
+```
+
+Gemini provider는 Google AI Studio의 Gemini API `generateContent` REST endpoint를 호출하며, 기본값으로 `responseMimeType=application/json`과 `responseJsonSchema`를 사용합니다.
 
 ## 프론트엔드 실행
 
@@ -82,7 +97,7 @@ npm run dev
 }
 ```
 
-응답은 `saju`, `questions`, `meta`를 반환합니다. `questions`는 항상 5개입니다.
+응답은 `saju`, `questions`, `meta`를 반환합니다. `questions`는 고정 질문 q1-q3과 선택 서술형 q4입니다.
 
 ### `POST /api/final-reading`
 
@@ -116,7 +131,7 @@ npm run dev
 }
 ```
 
-실제 요청에서는 `q1`부터 `q5`까지 5개 답변이 필요합니다.
+실제 요청에서는 필수 답변 q1, q2, q3, q5, q6, q7이 필요하며 q4와 q8은 선택입니다.
 
 ## Structured Output
 

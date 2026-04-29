@@ -6,7 +6,14 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 
 from app.config import Settings, get_settings
-from app.services.prompt_builder import FINAL_SYSTEM_PROMPT, FINAL_USER_PROMPT_TEMPLATE, QUESTION_SYSTEM_PROMPT, QUESTION_USER_PROMPT_TEMPLATE
+from app.services.prompt_builder import (
+    FINAL_SYSTEM_PROMPT_DIRECT,
+    FINAL_SYSTEM_PROMPT_EMPATHETIC,
+    FINAL_SYSTEM_PROMPT_TRADITIONAL,
+    FINAL_USER_PROMPT_TEMPLATE,
+    QUESTION_SYSTEM_PROMPT,
+    QUESTION_USER_PROMPT_TEMPLATE,
+)
 from app.services.prompt_store import PromptRecord, PromptStore
 from app.services.runtime_settings import resolve_runtime_llm_settings, save_runtime_llm_settings
 
@@ -16,7 +23,9 @@ settings_router = APIRouter(prefix="/api/admin/settings", tags=["admin"])
 DEFAULT_PROMPTS: dict[str, str] = {
     "question_system_prompt": QUESTION_SYSTEM_PROMPT,
     "question_user_prompt": QUESTION_USER_PROMPT_TEMPLATE,
-    "final_system_prompt": FINAL_SYSTEM_PROMPT,
+    "final_system_prompt_traditional": FINAL_SYSTEM_PROMPT_TRADITIONAL,
+    "final_system_prompt_empathetic": FINAL_SYSTEM_PROMPT_EMPATHETIC,
+    "final_system_prompt_direct": FINAL_SYSTEM_PROMPT_DIRECT,
     "final_user_prompt": FINAL_USER_PROMPT_TEMPLATE,
 }
 
@@ -36,20 +45,22 @@ class PromptResponse(BaseModel):
 
 
 class LLMSettingsUpdateRequest(BaseModel):
-    llm_provider: Literal["ollama", "groq"]
+    llm_provider: Literal["ollama", "groq", "gemini"]
     groq_model: str = Field(min_length=1, max_length=200)
     ollama_model: str = Field(min_length=1, max_length=200)
+    gemini_model: str = Field(min_length=1, max_length=200)
 
-    @field_validator("groq_model", "ollama_model", mode="before")
+    @field_validator("groq_model", "ollama_model", "gemini_model", mode="before")
     @classmethod
     def strip_model_name(cls, value: str) -> str:
         return value.strip() if isinstance(value, str) else value
 
 
 class LLMSettingsResponse(BaseModel):
-    llm_provider: Literal["ollama", "groq"]
+    llm_provider: Literal["ollama", "groq", "gemini"]
     groq_model: str
     ollama_model: str
+    gemini_model: str
     updated_at: dict[str, str]
 
 
@@ -115,6 +126,7 @@ async def get_llm_settings(
         llm_provider=runtime_settings.llm_provider,
         groq_model=runtime_settings.groq_model,
         ollama_model=runtime_settings.ollama_model,
+        gemini_model=runtime_settings.gemini_model,
         updated_at=runtime_settings.updated_at,
     )
 
@@ -129,10 +141,12 @@ async def put_llm_settings(
         llm_provider=payload.llm_provider,
         groq_model=payload.groq_model,
         ollama_model=payload.ollama_model,
+        gemini_model=payload.gemini_model,
     )
     return LLMSettingsResponse(
         llm_provider=payload.llm_provider,
         groq_model=payload.groq_model,
         ollama_model=payload.ollama_model,
+        gemini_model=payload.gemini_model,
         updated_at=updated_at,
     )

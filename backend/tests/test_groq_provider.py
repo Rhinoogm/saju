@@ -41,8 +41,9 @@ async def test_groq_auto_uses_json_object_for_models_without_json_schema_support
 
     payload = requests[0]
     assert payload["response_format"] == {"type": "json_object"}
-    assert payload["max_completion_tokens"] == 4096
-    assert "JSON Schema:" in payload["messages"][1]["content"]
+    assert payload["max_completion_tokens"] == 5000
+    assert "TestOutput 구조의 JSON 객체만 반환" in payload["messages"][1]["content"]
+    assert "JSON Schema:" not in payload["messages"][1]["content"]
 
 
 @pytest.mark.asyncio
@@ -195,7 +196,8 @@ async def test_groq_auto_retries_json_schema_400_with_json_object() -> None:
     assert len(requests) == 2
     assert requests[0]["response_format"]["type"] == "json_schema"
     assert requests[1]["response_format"] == {"type": "json_object"}
-    assert "JSON Schema:" in requests[1]["messages"][1]["content"]
+    assert "TestOutput 구조의 JSON 객체만 반환" in requests[1]["messages"][1]["content"]
+    assert "JSON Schema:" not in requests[1]["messages"][1]["content"]
     assert response.model == "fallback-model"
 
 
@@ -243,6 +245,7 @@ async def test_groq_raises_rate_limit_error_for_429() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             429,
+            headers={"Retry-After": "120"},
             json={
                 "error": {
                     "message": "rate limit exceeded",
@@ -258,13 +261,231 @@ async def test_groq_raises_rate_limit_error_for_429() -> None:
         transport=httpx.MockTransport(handler),
     )
 
-    with pytest.raises(LLMRateLimitError):
+    with pytest.raises(LLMRateLimitError) as exc_info:
         await provider.generate(
             system="system",
             prompt="prompt",
             schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
             schema_name="TestOutput",
         )
+
+    message = str(exc_info.value)
+    assert "rate limit exceeded" in message
+    assert "type=rate_limit_error" in message
+    assert "Retry after 120 seconds" in message
+
+
+@pytest.mark.asyncio
+async def test_groq_waits_and_retries_short_tpm_rate_limit() -> None:
+    requests: list[dict] = []
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.content))
+        if len(requests) == 1:
+            return httpx.Response(
+                429,
+                headers={"Retry-After": "35"},
+                json={
+                    "error": {
+                        "message": (
+                            "Rate limit reached for model `llama-3.1-8b-instant` on tokens per minute "
+                            "(TPM): Limit 6000, Used 4416, Requested 5006. Please try again in 34.22s."
+                        ),
+                        "type": "tokens",
+                        "code": "rate_limit_exceeded",
+                    }
+                },
+            )
+        return _chat_completion(model="retry-model")
+
+    provider = GroqProvider(
+        api_key="test-key",
+        base_url="http://groq.test/openai/v1",
+        model="llama-3.1-8b-instant",
+        transport=httpx.MockTransport(handler),
+        sleep=fake_sleep,
+    )
+
+    response = await provider.generate(
+        system="system",
+        prompt="prompt",
+        schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+        schema_name="TestOutput",
+    )
+
+    assert len(requests) == 2
+    assert sleeps == [35.0]
+    assert response.model == "retry-model"
+
+
+@pytest.mark.asyncio
+async def test_groq_parses_try_again_delay_when_retry_after_header_is_missing() -> None:
+    requests: list[dict] = []
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.content))
+        if len(requests) == 1:
+            return httpx.Response(
+                429,
+                json={
+                    "error": {
+                        "message": (
+                            "Rate limit reached on tokens per minute: Limit 6000, Used 4416, Requested 5006. "
+                            "Please try again in 34.22s."
+                        ),
+                        "type": "tokens",
+                        "code": "rate_limit_exceeded",
+                    }
+                },
+            )
+        return _chat_completion(model="retry-model")
+
+    provider = GroqProvider(
+        api_key="test-key",
+        base_url="http://groq.test/openai/v1",
+        model="llama-3.1-8b-instant",
+        transport=httpx.MockTransport(handler),
+        sleep=fake_sleep,
+    )
+
+    response = await provider.generate(
+        system="system",
+        prompt="prompt",
+        schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+        schema_name="TestOutput",
+    )
+
+    assert len(requests) == 2
+    assert sleeps == [34.22]
+    assert response.model == "retry-model"
+
+
+@pytest.mark.asyncio
+async def test_groq_raises_rate_limit_error_for_blocked_spend_limit() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            400,
+            json={
+                "error": {
+                    "message": "API access blocked by spend limit",
+                    "type": "invalid_request_error",
+                    "code": "blocked_api_access",
+                }
+            },
+        )
+
+    provider = GroqProvider(
+        api_key="test-key",
+        base_url="http://groq.test/openai/v1",
+        model="openai/gpt-oss-20b",
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(LLMRateLimitError) as exc_info:
+        await provider.generate(
+            system="system",
+            prompt="prompt",
+            schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+            schema_name="TestOutput",
+        )
+
+    message = str(exc_info.value)
+    assert "spend limit" in message
+    assert "code=blocked_api_access" in message
+
+
+@pytest.mark.asyncio
+async def test_groq_retries_oversized_tpm_request_with_reported_limit() -> None:
+    requests: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.content))
+        if len(requests) > 1:
+            return _chat_completion(model="fallback-model")
+
+        return httpx.Response(
+            413,
+            json={
+                "error": {
+                    "message": (
+                        "Request too large for model `llama-3.1-8b-instant` on tokens per minute "
+                        "(TPM): Limit 6000, Requested 7027, please reduce your message size and try again."
+                    ),
+                    "type": "tokens",
+                    "code": "rate_limit_exceeded",
+                }
+            },
+        )
+
+    provider = GroqProvider(
+        api_key="test-key",
+        base_url="http://groq.test/openai/v1",
+        model="llama-3.1-8b-instant",
+        max_completion_tokens=4096,
+        max_request_tokens=8000,
+        transport=httpx.MockTransport(handler),
+    )
+
+    response = await provider.generate(
+        system="system",
+        prompt="a" * 8000,
+        schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+        schema_name="TestOutput",
+    )
+
+    assert len(requests) == 2
+    assert requests[0]["max_completion_tokens"] == 4096
+    assert requests[1]["max_completion_tokens"] < requests[0]["max_completion_tokens"]
+    assert GroqProvider._estimate_payload_tokens(requests[1]) + requests[1]["max_completion_tokens"] <= 6000
+    assert response.model == "fallback-model"
+
+
+@pytest.mark.asyncio
+async def test_groq_raises_rate_limit_error_when_tpm_retry_still_fails() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            413,
+            json={
+                "error": {
+                    "message": (
+                        "Request too large for model `llama-3.1-8b-instant` on tokens per minute "
+                        "(TPM): Limit 6000, Requested 7027, please reduce your message size and try again."
+                    ),
+                    "type": "tokens",
+                    "code": "rate_limit_exceeded",
+                }
+            },
+        )
+
+    provider = GroqProvider(
+        api_key="test-key",
+        base_url="http://groq.test/openai/v1",
+        model="llama-3.1-8b-instant",
+        max_completion_tokens=4096,
+        max_request_tokens=8000,
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(LLMRateLimitError) as exc_info:
+        await provider.generate(
+            system="system",
+            prompt="prompt",
+            schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+            schema_name="TestOutput",
+        )
+
+    message = str(exc_info.value)
+    assert "Limit 6000" in message
+    assert "Requested 7027" in message
+    assert "code=rate_limit_exceeded" in message
 
 
 @pytest.mark.asyncio

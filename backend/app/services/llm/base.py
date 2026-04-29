@@ -16,6 +16,10 @@ class LLMRateLimitError(LLMProviderError):
     pass
 
 
+class LLMServiceUnavailableError(LLMProviderError):
+    pass
+
+
 @dataclass(frozen=True)
 class LLMResponse:
     content: str

@@ -22,6 +22,21 @@ class Gender(str, Enum):
     other = "other"
 
 
+class ConcernCategory(str, Enum):
+    romance = "romance"
+    career = "career"
+    finance = "finance"
+    health = "health"
+    academics = "academics"
+    others = "others"
+
+
+class ReadingStyle(str, Enum):
+    traditional = "traditional"
+    empathetic = "empathetic"
+    direct = "direct"
+
+
 class BirthInfo(BaseModel):
     calendar_type: CalendarType = CalendarType.solar
     year: int = Field(..., ge=1900, le=2100)
@@ -98,15 +113,15 @@ class QuestionOption(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(..., pattern="^[A-D]$")
-    label: str = Field(..., min_length=1, max_length=80)
+    label: str = Field(..., min_length=1, max_length=120)
 
 
 class DiagnosticQuestion(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(..., pattern="^q[1-5]$")
+    id: str = Field(..., pattern="^q[1-8]$")
     type: Literal["single_choice", "short_text"]
-    text: str = Field(..., min_length=8, max_length=160)
+    text: str = Field(..., min_length=8, max_length=90)
     options: list[QuestionOption] = Field(..., max_length=4)
     intent_signal: str = Field(
         ...,
@@ -133,14 +148,18 @@ class DiagnosticQuestion(BaseModel):
 class QuestionGenerationOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    questions: list[DiagnosticQuestion] = Field(..., min_length=5, max_length=5)
+    questions: list[DiagnosticQuestion] = Field(..., min_length=3, max_length=3)
 
     @model_validator(mode="after")
     def validate_question_ids(self) -> "QuestionGenerationOutput":
-        expected_ids = [f"q{index}" for index in range(1, 6)]
+        expected_ids = ["q5", "q6", "q7"]
         actual_ids = [question.id for question in self.questions]
         if actual_ids != expected_ids:
-            raise ValueError("question ids must be q1, q2, q3, q4, q5 in order")
+            raise ValueError("question ids must be q5, q6, q7 in order")
+        if any(question.type != "single_choice" for question in self.questions):
+            raise ValueError("custom questions must be single_choice")
+        if any([option.id for option in question.options] != ["A", "B", "C", "D"] for question in self.questions):
+            raise ValueError("custom questions must include exactly four options with ids A, B, C, D")
         return self
 
 
@@ -152,12 +171,14 @@ class ResponseMeta(BaseModel):
 
 class GenerateQuestionsResponse(BaseModel):
     saju: SajuData
+    category: ConcernCategory
+    category_label: str
     questions: list[DiagnosticQuestion]
     meta: ResponseMeta
 
 
 class QuestionAnswer(BaseModel):
-    question_id: str = Field(..., pattern="^q[1-5]$")
+    question_id: str = Field(..., pattern="^q[1-8]$")
     question: str = Field(..., min_length=1, max_length=180)
     answer: str = Field(..., min_length=1, max_length=400)
     selected_option_ids: list[OptionId] = Field(default_factory=list, max_length=4)
@@ -176,24 +197,46 @@ class QuestionAnswer(BaseModel):
         return self
 
 
-class FinalReadingRequest(InitialProfile):
-    answers: list[QuestionAnswer] = Field(..., min_length=5, max_length=5)
+class GenerateCustomQuestionsRequest(InitialProfile):
+    category: ConcernCategory
+    fixed_answers: list[QuestionAnswer] = Field(..., min_length=3, max_length=4)
 
     @model_validator(mode="after")
-    def validate_answer_ids(self) -> "FinalReadingRequest":
-        expected_ids = [f"q{index}" for index in range(1, 6)]
-        actual_ids = [answer.question_id for answer in self.answers]
-        if actual_ids != expected_ids:
-            raise ValueError("answers must be submitted as q1, q2, q3, q4, q5 in order")
+    def validate_fixed_answer_ids(self) -> "GenerateCustomQuestionsRequest":
+        actual_ids = [answer.question_id for answer in self.fixed_answers]
+        required_ids = ["q1", "q2", "q3"]
+        if actual_ids[:3] != required_ids:
+            raise ValueError("fixed_answers must start with q1, q2, q3 in order")
+        if len(actual_ids) == 4 and actual_ids[3] != "q4":
+            raise ValueError("the optional fixed answer must be q4")
+        if len(set(actual_ids)) != len(actual_ids):
+            raise ValueError("fixed_answers must not contain duplicate question ids")
         return self
 
 
-class ReadingInsightCard(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class GenerateCustomQuestionsResponse(BaseModel):
+    questions: list[DiagnosticQuestion]
+    meta: ResponseMeta
 
-    title: str = Field(..., min_length=2, max_length=30)
-    headline: str = Field(..., min_length=4, max_length=80)
-    body: str = Field(..., min_length=20, max_length=240)
+
+class FinalReadingRequest(InitialProfile):
+    category: ConcernCategory | None = None
+    reading_style: ReadingStyle = ReadingStyle.traditional
+    answers: list[QuestionAnswer] = Field(..., min_length=6, max_length=8)
+
+    @model_validator(mode="after")
+    def validate_answer_ids(self) -> "FinalReadingRequest":
+        actual_ids = [answer.question_id for answer in self.answers]
+        required_ids = ["q1", "q2", "q3", "q5", "q6", "q7"]
+        if len(set(actual_ids)) != len(actual_ids):
+            raise ValueError("answers must not contain duplicate question ids")
+        if [question_id for question_id in actual_ids if question_id not in {"q4", "q8"}] != required_ids:
+            raise ValueError("answers must include q1, q2, q3, q5, q6, q7 in order, with optional q4 and q8")
+        if "q4" in actual_ids and actual_ids.index("q4") != 3:
+            raise ValueError("optional q4 answer must appear after q3")
+        if "q8" in actual_ids and actual_ids.index("q8") != len(actual_ids) - 1:
+            raise ValueError("optional q8 answer must appear after q7")
+        return self
 
 
 class ReadingSection(BaseModel):
@@ -203,20 +246,39 @@ class ReadingSection(BaseModel):
     body: str = Field(..., min_length=60, max_length=700)
 
 
+class ReadingCareSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(..., min_length=2, max_length=36)
+    headline: str = Field(..., min_length=4, max_length=100)
+    summary: str = Field(..., min_length=20, max_length=220)
+    detail: str = Field(..., min_length=200, max_length=1200)
+
+
+class LuckRecipeItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    category: str = Field(..., min_length=2, max_length=20)
+    item: str = Field(..., min_length=1, max_length=40)
+    reason: str = Field(..., min_length=10, max_length=180)
+
+
 class FinalReadingOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     reading_title: str = Field(..., min_length=4, max_length=80)
-    desired_conclusion: str = Field(..., min_length=4, max_length=160)
     core_message: str = Field(..., min_length=8, max_length=120)
-    final_text: str = Field(..., min_length=80, max_length=1200)
-    summary_cards: list[ReadingInsightCard] = Field(..., min_length=4, max_length=4)
-    deep_sections: list[ReadingSection] = Field(..., min_length=4, max_length=4)
+    situation_mirror: ReadingCareSection
+    saju_insight: ReadingCareSection
+    clear_solution: ReadingCareSection
+    saju_vibe: ReadingCareSection
+    secret_talent: ReadingCareSection
     answer_signals: list[str] = Field(..., min_length=3, max_length=5)
+    answer_signal_summary: str = Field(..., min_length=30, max_length=180)
     saju_basis: list[str] = Field(..., min_length=3, max_length=5)
-    timing_points: list[str] = Field(..., min_length=2, max_length=4)
-    action_steps: list[str] = Field(..., min_length=2, max_length=4)
-    watchouts: list[str] = Field(..., min_length=2, max_length=3)
+    timing_points: list[str] = Field(..., min_length=3, max_length=3)
+    luck_recipe: list[LuckRecipeItem] = Field(..., min_length=4, max_length=4)
+    re_engagement_hook: ReadingSection
     caution: str = Field(..., min_length=8, max_length=240)
 
 

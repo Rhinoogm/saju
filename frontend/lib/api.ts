@@ -1,6 +1,8 @@
 export type CalendarType = "solar" | "lunar";
 export type Gender = "male" | "female" | "other";
 export type QuestionType = "single_choice" | "short_text";
+export type ConcernCategory = "romance" | "career" | "finance" | "health" | "academics" | "others";
+export type ReadingStyle = "traditional" | "empathetic" | "direct";
 
 export interface BirthInfo {
   calendar_type: CalendarType;
@@ -88,33 +90,52 @@ export interface ResponseMeta {
 
 export interface GenerateQuestionsResponse {
   saju: SajuData;
+  category: ConcernCategory;
+  category_label: string;
   questions: DiagnosticQuestion[];
   meta: ResponseMeta;
 }
 
-export interface ReadingInsightCard {
-  title: string;
-  headline: string;
-  body: string;
+export interface GenerateCustomQuestionsRequest extends InitialProfile {
+  category: ConcernCategory;
+  fixed_answers: QuestionAnswer[];
 }
 
-export interface ReadingSection {
+export interface GenerateCustomQuestionsResponse {
+  questions: DiagnosticQuestion[];
+  meta: ResponseMeta;
+}
+
+export interface ReadingCareSection {
   title: string;
-  body: string;
+  headline: string;
+  summary: string;
+  detail: string;
+}
+
+export interface LuckRecipeItem {
+  category: string;
+  item: string;
+  reason: string;
 }
 
 export interface FinalReading {
   reading_title: string;
-  desired_conclusion: string;
   core_message: string;
-  final_text: string;
-  summary_cards: ReadingInsightCard[];
-  deep_sections: ReadingSection[];
+  situation_mirror: ReadingCareSection;
+  saju_insight: ReadingCareSection;
+  clear_solution: ReadingCareSection;
+  saju_vibe: ReadingCareSection;
+  secret_talent: ReadingCareSection;
   answer_signals: string[];
+  answer_signal_summary: string;
   saju_basis: string[];
   timing_points: string[];
-  action_steps: string[];
-  watchouts: string[];
+  luck_recipe: LuckRecipeItem[];
+  re_engagement_hook: {
+    title: string;
+    body: string;
+  };
   caution: string;
 }
 
@@ -190,7 +211,11 @@ export function generateQuestions(payload: InitialProfile): Promise<GenerateQues
   return postJson<GenerateQuestionsResponse>("/api/generate-questions", payload);
 }
 
-export function requestFinalReading(payload: InitialProfile & { answers: QuestionAnswer[] }): Promise<FinalReadingResponse> {
+export function generateCustomQuestions(payload: GenerateCustomQuestionsRequest): Promise<GenerateCustomQuestionsResponse> {
+  return postJson<GenerateCustomQuestionsResponse>("/api/generate-custom-questions", payload);
+}
+
+export function requestFinalReading(payload: InitialProfile & { category?: ConcernCategory; reading_style?: ReadingStyle; answers: QuestionAnswer[] }): Promise<FinalReadingResponse> {
   return postJson<FinalReadingResponse>("/api/final-reading", payload);
 }
 
