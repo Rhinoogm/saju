@@ -117,17 +117,29 @@ export interface ReadingSection {
   body: string;
 }
 
+export interface ReadingCareSection {
+  title: string;
+  headline: string;
+  body: string;
+}
+
+export interface LuckRecipeItem {
+  category: string;
+  item: string;
+  reason: string;
+}
+
 export interface FinalReading {
   reading_title: string;
-  desired_conclusion: string;
   core_message: string;
-  final_text: string;
-  summary_cards: ReadingInsightCard[];
-  deep_sections: ReadingSection[];
+  hashtags: string[];
+  warm_hug: ReadingCareSection;
+  saju_vibe: ReadingCareSection;
+  secret_talent: ReadingCareSection;
   answer_signals: string[];
   saju_basis: string[];
   timing_points: string[];
-  action_steps: string[];
+  luck_recipe: LuckRecipeItem[];
   watchouts: string[];
   caution: string;
 }

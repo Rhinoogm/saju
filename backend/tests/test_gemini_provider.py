@@ -97,6 +97,82 @@ async def test_gemini_raises_rate_limit_error_for_429() -> None:
 
 
 @pytest.mark.asyncio
+async def test_gemini_retries_transient_503_then_succeeds() -> None:
+    calls = 0
+    sleeps: list[float] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(
+                503,
+                json={
+                    "error": {
+                        "code": 503,
+                        "message": "This model is currently experiencing high demand. Please try again later.",
+                        "status": "UNAVAILABLE",
+                    }
+                },
+            )
+        return _generate_content_response(model="gemini-retry")
+
+    async def sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    provider = GeminiProvider(
+        api_key="test-key",
+        base_url="http://gemini.test/v1beta",
+        transport=httpx.MockTransport(handler),
+        transient_retry_seconds=0.25,
+        sleep=sleep,
+    )
+
+    response = await provider.generate(system="system", prompt="prompt", schema={"type": "object"}, schema_name="TestSchema")
+
+    assert response.model == "gemini-retry"
+    assert calls == 2
+    assert sleeps == [0.25]
+
+
+@pytest.mark.asyncio
+async def test_gemini_reports_friendly_error_after_transient_503_retries() -> None:
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            503,
+            json={
+                "error": {
+                    "code": 503,
+                    "message": "This model is currently experiencing high demand. Please try again later.",
+                    "status": "UNAVAILABLE",
+                }
+            },
+        )
+
+    async def sleep(seconds: float) -> None:
+        return None
+
+    provider = GeminiProvider(
+        api_key="test-key",
+        base_url="http://gemini.test/v1beta",
+        transport=httpx.MockTransport(handler),
+        max_transient_retries=1,
+        transient_retry_seconds=0,
+        sleep=sleep,
+    )
+
+    with pytest.raises(LLMProviderError) as exc_info:
+        await provider.generate(system="system", prompt="prompt", schema={"type": "object"}, schema_name="TestSchema")
+
+    assert calls == 2
+    assert str(exc_info.value) == "Gemini 모델 사용량이 많아 응답하지 못했어요. 잠시 후 다시 시도해주세요."
+
+
+@pytest.mark.asyncio
 async def test_gemini_raises_clear_error_when_generation_hits_length_limit() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(

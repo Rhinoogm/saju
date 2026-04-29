@@ -254,19 +254,35 @@ class ReadingSection(BaseModel):
     body: str = Field(..., min_length=60, max_length=700)
 
 
+class ReadingCareSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(..., min_length=2, max_length=36)
+    headline: str = Field(..., min_length=4, max_length=100)
+    body: str = Field(..., min_length=40, max_length=700)
+
+
+class LuckRecipeItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    category: str = Field(..., min_length=2, max_length=20)
+    item: str = Field(..., min_length=1, max_length=40)
+    reason: str = Field(..., min_length=10, max_length=180)
+
+
 class FinalReadingOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     reading_title: str = Field(..., min_length=4, max_length=80)
-    desired_conclusion: str = Field(..., min_length=4, max_length=160)
     core_message: str = Field(..., min_length=8, max_length=120)
-    final_text: str = Field(..., min_length=80, max_length=1200)
-    summary_cards: list[ReadingInsightCard] = Field(..., min_length=4, max_length=4)
-    deep_sections: list[ReadingSection] = Field(..., min_length=4, max_length=4)
+    hashtags: list[str] = Field(..., min_length=3, max_length=5)
+    warm_hug: ReadingCareSection
+    saju_vibe: ReadingCareSection
+    secret_talent: ReadingCareSection
     answer_signals: list[str] = Field(..., min_length=3, max_length=5)
     saju_basis: list[str] = Field(..., min_length=3, max_length=5)
-    timing_points: list[str] = Field(..., min_length=2, max_length=4)
-    action_steps: list[str] = Field(..., min_length=2, max_length=4)
+    timing_points: list[str] = Field(..., min_length=3, max_length=3)
+    luck_recipe: list[LuckRecipeItem] = Field(..., min_length=4, max_length=4)
     watchouts: list[str] = Field(..., min_length=2, max_length=3)
     caution: str = Field(..., min_length=8, max_length=240)
 

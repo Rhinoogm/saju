@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
+from collections.abc import Awaitable, Callable
 from typing import Any, Literal
 from urllib.parse import quote
 
@@ -10,6 +12,9 @@ import httpx
 from app.services.llm.base import LLMProviderError, LLMRateLimitError, LLMResponse, LLMTimeoutError
 
 _ERROR_BODY_LIMIT = 500
+_DEFAULT_TRANSIENT_RETRY_SECONDS = 1.0
+_MAX_TRANSIENT_RETRY_SECONDS = 10.0
+_TRANSIENT_STATUS_CODES = frozenset({500, 502, 503, 504})
 
 
 class GeminiProvider:
@@ -24,6 +29,9 @@ class GeminiProvider:
         response_schema_mode: Literal["json_schema", "json", "none"] = "json_schema",
         max_output_tokens: int | None = 5000,
         transport: httpx.AsyncBaseTransport | None = None,
+        max_transient_retries: int = 2,
+        transient_retry_seconds: float = _DEFAULT_TRANSIENT_RETRY_SECONDS,
+        sleep: Callable[[float], Awaitable[None]] | None = None,
     ) -> None:
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
@@ -33,6 +41,9 @@ class GeminiProvider:
         self.response_schema_mode = response_schema_mode
         self.max_output_tokens = max_output_tokens
         self.transport = transport
+        self.max_transient_retries = max(0, max_transient_retries)
+        self.transient_retry_seconds = max(0.0, transient_retry_seconds)
+        self.sleep = sleep or asyncio.sleep
 
     @property
     def endpoint(self) -> str:
@@ -170,6 +181,37 @@ class GeminiProvider:
             )
         )
 
+    @staticmethod
+    def _is_transient_overload_response(status_code: int, error_text: str) -> bool:
+        if status_code not in _TRANSIENT_STATUS_CODES:
+            return False
+        normalized_error = error_text.lower()
+        return status_code == 503 or any(
+            marker in normalized_error
+            for marker in (
+                "unavailable",
+                "high demand",
+                "overloaded",
+                "temporarily",
+                "try again later",
+            )
+        )
+
+    @staticmethod
+    def _retry_after_seconds(retry_after: str | None) -> float | None:
+        if not retry_after:
+            return None
+        try:
+            return max(0.0, float(retry_after))
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _transient_error_message(error_text: str) -> str:
+        if "high demand" in error_text.lower() or "unavailable" in error_text.lower():
+            return "Gemini 모델 사용량이 많아 응답하지 못했어요. 잠시 후 다시 시도해주세요."
+        return "Gemini 모델이 일시적으로 응답하지 못했어요. 잠시 후 다시 시도해주세요."
+
     async def generate(
         self,
         *,
@@ -186,24 +228,37 @@ class GeminiProvider:
             "Content-Type": "application/json",
             "x-goog-api-key": self.api_key,
         }
+        transient_retry_count = 0
 
-        try:
-            client_options: dict[str, Any] = {"timeout": self.timeout_seconds}
-            if self.transport is not None:
-                client_options["transport"] = self.transport
+        while True:
+            try:
+                client_options: dict[str, Any] = {"timeout": self.timeout_seconds}
+                if self.transport is not None:
+                    client_options["transport"] = self.transport
 
-            async with httpx.AsyncClient(**client_options) as client:
-                response = await client.post(self.endpoint, headers=headers, json=payload)
-                response.raise_for_status()
-        except httpx.TimeoutException as exc:
-            raise LLMTimeoutError("Gemini request timed out") from exc
-        except httpx.HTTPStatusError as exc:
-            error_text = self._response_error_text(exc.response)
-            if self._is_quota_or_rate_limit_response(exc.response.status_code, error_text):
-                raise LLMRateLimitError(f"Gemini API limit reached: {error_text}") from exc
-            raise LLMProviderError(f"Gemini returned HTTP {exc.response.status_code}: {error_text}") from exc
-        except httpx.HTTPError as exc:
-            raise LLMProviderError(f"Gemini request failed: {exc}") from exc
+                async with httpx.AsyncClient(**client_options) as client:
+                    response = await client.post(self.endpoint, headers=headers, json=payload)
+                    response.raise_for_status()
+                break
+            except httpx.TimeoutException as exc:
+                raise LLMTimeoutError("Gemini request timed out") from exc
+            except httpx.HTTPStatusError as exc:
+                error_text = self._response_error_text(exc.response)
+                if self._is_quota_or_rate_limit_response(exc.response.status_code, error_text):
+                    raise LLMRateLimitError(f"Gemini API limit reached: {error_text}") from exc
+
+                if self._is_transient_overload_response(exc.response.status_code, error_text):
+                    retry_after = self._retry_after_seconds(exc.response.headers.get("Retry-After"))
+                    retry_delay = retry_after if retry_after is not None else self.transient_retry_seconds
+                    if transient_retry_count < self.max_transient_retries and retry_delay <= _MAX_TRANSIENT_RETRY_SECONDS:
+                        transient_retry_count += 1
+                        await self.sleep(retry_delay)
+                        continue
+                    raise LLMProviderError(self._transient_error_message(error_text)) from exc
+
+                raise LLMProviderError(f"Gemini returned HTTP {exc.response.status_code}: {error_text}") from exc
+            except httpx.HTTPError as exc:
+                raise LLMProviderError(f"Gemini request failed: {exc}") from exc
 
         body = response.json()
         try:

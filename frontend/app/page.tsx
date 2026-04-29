@@ -454,7 +454,7 @@ export default function Home() {
         )}
 
         {step === "result" && finalResult && (
-          <ReadingResult result={finalResult} onBack={() => setStep("custom")} onRestart={restart} />
+          <ReadingResult result={finalResult} profileName={profile.name} onBack={() => setStep("custom")} onRestart={restart} />
         )}
 
         {step === "saju" && sajuOnlyResult && (

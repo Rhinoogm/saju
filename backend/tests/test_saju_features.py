@@ -80,17 +80,22 @@ def test_final_prompt_requests_report_structure(sample_request, sample_saju_data
     payload["category"] = "career"
     built = build_final_reading_prompt(FinalReadingRequest(**payload), sample_saju_data)
 
-    assert "프리미엄 최종 사주풀이 리포트" in built.prompt
-    assert "summary_cards" in built.prompt
-    assert "deep_sections" in built.prompt
+    assert "프리미엄 멘탈 케어 사주 결과지" in built.prompt
+    assert "hashtags" in built.prompt
+    assert "warm_hug" in built.prompt
+    assert "saju_vibe" in built.prompt
+    assert "luck_recipe" in built.prompt
+    assert "전문가 차트" in built.prompt
+    assert "행운의 레시피" in built.prompt
     assert "timing_points" in built.prompt
     assert "고정 질문 및 맞춤형 심층 질문 답변" in built.prompt
     assert "출력 예산" in built.prompt
-    assert "한 줄의 명쾌한 답" in built.prompt
-    assert "사주 용어와 쉬운 번역" in built.prompt
+    assert "정당성(Validation)" in built.prompt
     assert sample_request.initial_concern in built.prompt
     assert built.schema_name == "FinalReadingOutput"
-    assert "summary_cards" in built.schema["properties"]
+    assert "warm_hug" in built.schema["properties"]
+    assert "luck_recipe" in built.schema["properties"]
+    assert "final_text" not in built.schema["properties"]
     assert "calculation_note" not in built.prompt
     assert "MVP" not in built.prompt
 

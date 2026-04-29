@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes.admin_prompts import migrate_legacy_default_prompts
 from app.api.routes.admin_prompts import router as admin_prompts_router
 from app.api.routes.admin_prompts import settings_router as admin_settings_router
 from app.api.routes.saju import router as saju_router
@@ -17,6 +18,7 @@ def create_app() -> FastAPI:
     if settings.enable_admin_prompts:
         store = PromptStore(settings.prompts_db_path)
         store.init()
+        migrate_legacy_default_prompts(store)
         app.state.prompt_store = store
 
     app.state.llm_rate_limiter = None
