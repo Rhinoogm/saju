@@ -133,14 +133,19 @@ export interface FinalReading {
   reading_title: string;
   core_message: string;
   hashtags: string[];
-  warm_hug: ReadingCareSection;
+  situation_mirror: ReadingCareSection;
+  saju_insight: ReadingCareSection;
+  clear_solution: ReadingCareSection;
   saju_vibe: ReadingCareSection;
   secret_talent: ReadingCareSection;
   answer_signals: string[];
   saju_basis: string[];
   timing_points: string[];
   luck_recipe: LuckRecipeItem[];
-  watchouts: string[];
+  re_engagement_hook: {
+    title: string;
+    body: string;
+  };
   caution: string;
 }
 

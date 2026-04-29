@@ -189,7 +189,7 @@ export function ReadingResult({ result, profileName, onBack, onRestart }: Readin
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="inline-flex items-center gap-2 rounded-lg bg-[#fff0f3] px-3 py-1.5 text-xs font-black text-berry">
-              <Sparkles size={14} aria-hidden /> 멘탈 케어 리딩
+              <Sparkles size={14} aria-hidden /> 맞춤 사주 리딩
             </p>
             <p className="mt-3 text-sm font-bold leading-6 text-stone-500">
               {saju.solar_date} · {saju.birth_time}
@@ -235,20 +235,27 @@ export function ReadingResult({ result, profileName, onBack, onRestart }: Readin
         </div>
       </header>
 
-      <section className="rounded-lg border border-[#eadfce] bg-white p-4 shadow-[0_14px_36px_rgba(83,64,42,0.06)] sm:p-5">
-        <div className="mb-3 flex items-center gap-2 text-sm font-black text-stone-700">
-          <Star size={17} aria-hidden /> 마음에서 읽힌 신호
-        </div>
-        <div className="grid gap-2 sm:grid-cols-3">
-          {reading.answer_signals.map((signal) => (
-            <div key={signal} className="rounded-lg bg-[#f7f8f5] px-4 py-3 text-sm font-black leading-6 text-ink">
-              {signal}
-            </div>
-          ))}
-        </div>
-      </section>
+      <div className="grid gap-4 lg:grid-cols-[1.35fr_0.9fr]">
+        <CareSection section={reading.situation_mirror} icon={HeartHandshake} tone="rose" />
 
-      <CareSection section={reading.warm_hug} icon={HeartHandshake} tone="rose" />
+        <section className="rounded-lg border border-[#eadfce] bg-white p-4 shadow-[0_14px_36px_rgba(83,64,42,0.06)] sm:p-5">
+          <div className="mb-3 flex items-center gap-2 text-sm font-black text-stone-700">
+            <Star size={17} aria-hidden /> 답변에서 읽힌 신호
+          </div>
+          <div className="grid gap-2">
+            {reading.answer_signals.map((signal) => (
+              <div key={signal} className="rounded-lg bg-[#f7f8f5] px-4 py-3 text-sm font-black leading-6 text-ink">
+                {signal}
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <CareSection section={reading.saju_insight} icon={Star} tone="mint" />
+        <CareSection section={reading.clear_solution} icon={ShieldCheck} tone="honey" />
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <CareSection section={reading.saju_vibe} icon={Leaf} tone="mint" />
@@ -287,14 +294,19 @@ export function ReadingResult({ result, profileName, onBack, onRestart }: Readin
         </div>
       </section>
 
-      <section className="grid gap-3">
-        <ReportList title="조심할 점" items={reading.watchouts} tone="warm" />
-        <section className="rounded-lg border border-[#f0dfc4] bg-[#fff8e8] p-4">
-          <div className="flex items-start gap-3">
-            <CircleAlert className="mt-0.5 shrink-0 text-coral" size={18} aria-hidden />
-            <p className="break-keep text-sm font-bold leading-6 text-stone-700">{reading.caution}</p>
-          </div>
-        </section>
+      <section className="rounded-lg border border-[#cce8e2] bg-[#f4fbf8] p-5 shadow-[0_14px_36px_rgba(83,64,42,0.06)] sm:p-6">
+        <div className="mb-3 flex items-center gap-2 text-sm font-black text-mint">
+          <Gem size={18} aria-hidden /> {reading.re_engagement_hook.title}
+        </div>
+        <p className="max-w-3xl break-keep text-base font-bold leading-8 text-stone-700">{reading.re_engagement_hook.body}</p>
+        <button
+          type="button"
+          onClick={onRestart}
+          className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-ink px-4 text-sm font-black text-white transition hover:bg-mint"
+        >
+          <RefreshCcw size={16} aria-hidden />
+          다른 주제로 다시 보기
+        </button>
       </section>
 
       <section className="rounded-lg border border-stone-200 bg-white shadow-[0_14px_36px_rgba(83,64,42,0.06)]">
@@ -309,6 +321,12 @@ export function ReadingResult({ result, profileName, onBack, onRestart }: Readin
           <ElementBars result={result} />
           <DaewoonTimeline periods={saju.daewoon} />
           <ReportList title="명식 근거" items={reading.saju_basis} />
+        </div>
+        <div className="border-t border-stone-100 px-5 py-4">
+          <div className="flex items-start gap-3 rounded-lg border border-[#f0dfc4] bg-[#fff8e8] p-4">
+            <CircleAlert className="mt-0.5 shrink-0 text-coral" size={18} aria-hidden />
+            <p className="break-keep text-sm font-bold leading-6 text-stone-700">{reading.caution}</p>
+          </div>
         </div>
         <div className="border-t border-stone-100 px-5 py-4">
           <p className="break-keep text-xs font-bold leading-5 text-stone-500">

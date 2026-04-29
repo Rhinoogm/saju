@@ -80,20 +80,29 @@ def test_final_prompt_requests_report_structure(sample_request, sample_saju_data
     payload["category"] = "career"
     built = build_final_reading_prompt(FinalReadingRequest(**payload), sample_saju_data)
 
-    assert "프리미엄 멘탈 케어 사주 결과지" in built.prompt
+    assert "프리미엄 맞춤형 사주 결과지" in built.prompt
     assert "hashtags" in built.prompt
-    assert "warm_hug" in built.prompt
+    assert "situation_mirror" in built.prompt
+    assert "saju_insight" in built.prompt
+    assert "clear_solution" in built.prompt
+    assert "re_engagement_hook" in built.prompt
     assert "saju_vibe" in built.prompt
     assert "luck_recipe" in built.prompt
-    assert "전문가 차트" in built.prompt
+    assert "전문가 데이터" in built.prompt
     assert "행운의 레시피" in built.prompt
     assert "timing_points" in built.prompt
-    assert "고정 질문 및 맞춤형 심층 질문 답변" in built.prompt
+    assert "고정 질문 및 맞춤 심층 질문 답변" in built.prompt
     assert "출력 예산" in built.prompt
-    assert "정당성(Validation)" in built.prompt
+    assert "감정 과잉 및 바이어스" in built.prompt
+    assert "당신의 현재 주파수" in built.prompt
+    assert "명쾌한 처방전" in built.prompt
+    assert "다음엔 이런 것도 궁금해질 거예요" in built.prompt
     assert sample_request.initial_concern in built.prompt
     assert built.schema_name == "FinalReadingOutput"
-    assert "warm_hug" in built.schema["properties"]
+    assert "situation_mirror" in built.schema["properties"]
+    assert "saju_insight" in built.schema["properties"]
+    assert "clear_solution" in built.schema["properties"]
+    assert "re_engagement_hook" in built.schema["properties"]
     assert "luck_recipe" in built.schema["properties"]
     assert "final_text" not in built.schema["properties"]
     assert "calculation_note" not in built.prompt

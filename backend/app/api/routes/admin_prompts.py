@@ -11,7 +11,7 @@ from app.services.prompt_builder import (
     FINAL_SYSTEM_PROMPT_EMPATHETIC,
     FINAL_SYSTEM_PROMPT_TRADITIONAL,
     FINAL_USER_PROMPT_TEMPLATE,
-    LEGACY_FINAL_USER_PROMPT_TEMPLATE,
+    KNOWN_DEFAULT_FINAL_USER_PROMPTS,
     QUESTION_SYSTEM_PROMPT,
     QUESTION_USER_PROMPT_TEMPLATE,
 )
@@ -36,7 +36,11 @@ def migrate_legacy_default_prompts(store: PromptStore) -> None:
     if record is None:
         return
 
-    legacy_defaults = {LEGACY_FINAL_USER_PROMPT_TEMPLATE, LEGACY_FINAL_USER_PROMPT_TEMPLATE.strip()}
+    legacy_defaults = {
+        prompt
+        for default_prompt in KNOWN_DEFAULT_FINAL_USER_PROMPTS
+        for prompt in (default_prompt, default_prompt.strip())
+    }
     if record.content in legacy_defaults:
         store.set_prompt("final_user_prompt", FINAL_USER_PROMPT_TEMPLATE)
 

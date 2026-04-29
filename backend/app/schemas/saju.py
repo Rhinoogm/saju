@@ -276,14 +276,16 @@ class FinalReadingOutput(BaseModel):
     reading_title: str = Field(..., min_length=4, max_length=80)
     core_message: str = Field(..., min_length=8, max_length=120)
     hashtags: list[str] = Field(..., min_length=3, max_length=5)
-    warm_hug: ReadingCareSection
+    situation_mirror: ReadingCareSection
+    saju_insight: ReadingCareSection
+    clear_solution: ReadingCareSection
     saju_vibe: ReadingCareSection
     secret_talent: ReadingCareSection
     answer_signals: list[str] = Field(..., min_length=3, max_length=5)
     saju_basis: list[str] = Field(..., min_length=3, max_length=5)
     timing_points: list[str] = Field(..., min_length=3, max_length=3)
     luck_recipe: list[LuckRecipeItem] = Field(..., min_length=4, max_length=4)
-    watchouts: list[str] = Field(..., min_length=2, max_length=3)
+    re_engagement_hook: ReadingSection
     caution: str = Field(..., min_length=8, max_length=240)
 
 
