@@ -1,8 +1,12 @@
+import { createClient } from "@/lib/supabase/client";
+import { LOCAL_DEMO_BEARER_TOKEN, hasLocalDemoSession, isLocalDemoMode } from "@/lib/localDemo";
+
 export type CalendarType = "solar" | "lunar";
 export type Gender = "male" | "female" | "other";
 export type QuestionType = "single_choice" | "short_text";
 export type ConcernCategory = "romance" | "career" | "finance" | "health" | "academics" | "others";
 export type ReadingStyle = "traditional" | "empathetic" | "direct";
+export type ReadingSessionStatus = "payment_required" | "paid" | "fixed_questions_ready" | "custom_questions_ready" | "final_ready" | "failed";
 
 export interface BirthInfo {
   calendar_type: CalendarType;
@@ -96,11 +100,6 @@ export interface GenerateQuestionsResponse {
   meta: ResponseMeta;
 }
 
-export interface GenerateCustomQuestionsRequest extends InitialProfile {
-  category: ConcernCategory;
-  fixed_answers: QuestionAnswer[];
-}
-
 export interface GenerateCustomQuestionsResponse {
   questions: DiagnosticQuestion[];
   meta: ResponseMeta;
@@ -145,14 +144,72 @@ export interface FinalReadingResponse {
   meta: ResponseMeta;
 }
 
-export interface SajuOnlyRequest {
-  name: string;
-  gender: Gender;
-  birth: BirthInfo;
+export interface ReadingSessionResponse {
+  id: string;
+  user_id: string;
+  order_id: string | null;
+  status: ReadingSessionStatus;
+  reading_style: ReadingStyle;
+  initial_profile: InitialProfile;
+  saju: SajuData | null;
+  category: ConcernCategory | null;
+  category_label: string | null;
+  fixed_questions: DiagnosticQuestion[] | null;
+  fixed_answers: QuestionAnswer[] | null;
+  custom_questions: DiagnosticQuestion[] | null;
+  custom_answers: QuestionAnswer[] | null;
+  final_result: FinalReadingResponse | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
-export interface SajuOnlyResponse {
-  saju: SajuData;
+export interface CheckoutResponse {
+  order_id: string;
+  payment_id: string;
+  store_id: string;
+  channel_key: string;
+  order_name: string;
+  total_amount: number;
+  currency: "KRW";
+  notice_urls: string[];
+}
+
+export interface PaymentCompleteResponse {
+  order_id: string;
+  session_id: string | null;
+  payment_id: string;
+  status: string;
+  credit_status: string | null;
+}
+
+export interface AccountMeResponse {
+  id: string;
+  email: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  provider: string | null;
+}
+
+export interface AccountOrderResponse {
+  id: string;
+  payment_id: string;
+  product_code: string;
+  order_name: string;
+  amount_krw: number;
+  currency: string;
+  status: string;
+  paid_at: string | null;
+  created_at: string | null;
+}
+
+export interface AccountReadingResponse {
+  id: string;
+  status: ReadingSessionStatus;
+  reading_style: ReadingStyle;
+  order_id: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  has_final_result: boolean;
 }
 
 export class ApiError extends Error {
@@ -177,20 +234,43 @@ function apiUrl(path: string) {
   return `${apiBaseUrl()}/${path.replace(/^\/+/, "")}`;
 }
 
-async function postJson<TResponse>(path: string, payload: unknown): Promise<TResponse> {
-  const response = await fetch(apiUrl(path), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+async function authHeaders() {
+  if (isLocalDemoMode()) {
+    if (!hasLocalDemoSession()) {
+      throw new ApiError("로그인이 필요합니다.", 401);
+    }
+    return {
+      Authorization: `Bearer ${LOCAL_DEMO_BEARER_TOKEN}`,
+    };
+  }
 
+  let supabase: ReturnType<typeof createClient>;
+  try {
+    supabase = createClient();
+  } catch (err) {
+    throw new ApiError(err instanceof Error ? err.message : "로그인 설정을 확인해주세요.", 503);
+  }
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new ApiError("로그인이 필요합니다.", 401);
+  }
+  return {
+    Authorization: `Bearer ${session.access_token}`,
+  };
+}
+
+async function readResponse<TResponse>(response: Response): Promise<TResponse> {
   if (!response.ok) {
     let message =
-      response.status === 429
-        ? "무료 공개 데모의 요청 한도에 도달했어요. 잠시 뒤 다시 시도해주세요."
-        : `요청이 실패했어요. (${response.status})`;
+      response.status === 401
+        ? "로그인이 필요합니다."
+        : response.status === 402
+          ? "결제가 필요합니다."
+          : response.status === 429
+            ? "요청 한도에 도달했어요. 잠시 뒤 다시 시도해주세요."
+            : `요청이 실패했어요. (${response.status})`;
     try {
       const body = await response.json();
       if (typeof body.detail === "string") {
@@ -203,22 +283,78 @@ async function postJson<TResponse>(path: string, payload: unknown): Promise<TRes
     }
     throw new ApiError(message, response.status);
   }
-
   return response.json();
 }
 
-export function generateQuestions(payload: InitialProfile): Promise<GenerateQuestionsResponse> {
-  return postJson<GenerateQuestionsResponse>("/api/generate-questions", payload);
+async function requestJson<TResponse>(method: "GET" | "POST" | "PUT", path: string, payload?: unknown): Promise<TResponse> {
+  const headers: Record<string, string> = {
+    ...(await authHeaders()),
+  };
+  if (payload !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+  const response = await fetch(apiUrl(path), {
+    method,
+    headers,
+    body: payload === undefined ? undefined : JSON.stringify(payload),
+    cache: "no-store",
+  });
+  return readResponse<TResponse>(response);
 }
 
-export function generateCustomQuestions(payload: GenerateCustomQuestionsRequest): Promise<GenerateCustomQuestionsResponse> {
-  return postJson<GenerateCustomQuestionsResponse>("/api/generate-custom-questions", payload);
+export function createReadingSession(payload: InitialProfile & { reading_style: ReadingStyle }): Promise<ReadingSessionResponse> {
+  return requestJson<ReadingSessionResponse>("POST", "/api/reading-sessions", payload);
 }
 
-export function requestFinalReading(payload: InitialProfile & { category?: ConcernCategory; reading_style?: ReadingStyle; answers: QuestionAnswer[] }): Promise<FinalReadingResponse> {
-  return postJson<FinalReadingResponse>("/api/final-reading", payload);
+export function getReadingSession(sessionId: string): Promise<ReadingSessionResponse> {
+  return requestJson<ReadingSessionResponse>("GET", `/api/reading-sessions/${sessionId}`);
 }
 
-export function requestSajuOnly(payload: SajuOnlyRequest): Promise<SajuOnlyResponse> {
-  return postJson<SajuOnlyResponse>("/api/saju-only", payload);
+export function createCheckout(sessionId: string, productCode = "SAJU_FULL_READING"): Promise<CheckoutResponse> {
+  return requestJson<CheckoutResponse>("POST", "/api/payments/checkout", {
+    session_id: sessionId,
+    product_code: productCode,
+  });
+}
+
+export function completePayment(paymentId: string): Promise<PaymentCompleteResponse> {
+  return requestJson<PaymentCompleteResponse>("POST", "/api/payments/complete", {
+    payment_id: paymentId,
+  });
+}
+
+export function generateQuestions(sessionId: string): Promise<GenerateQuestionsResponse> {
+  return requestJson<GenerateQuestionsResponse>("POST", `/api/reading-sessions/${sessionId}/generate-questions`);
+}
+
+export function saveFixedAnswers(sessionId: string, fixedAnswers: QuestionAnswer[]): Promise<ReadingSessionResponse> {
+  return requestJson<ReadingSessionResponse>("PUT", `/api/reading-sessions/${sessionId}/fixed-answers`, {
+    fixed_answers: fixedAnswers,
+  });
+}
+
+export function generateCustomQuestions(sessionId: string): Promise<GenerateCustomQuestionsResponse> {
+  return requestJson<GenerateCustomQuestionsResponse>("POST", `/api/reading-sessions/${sessionId}/generate-custom-questions`);
+}
+
+export function saveCustomAnswers(sessionId: string, customAnswers: QuestionAnswer[]): Promise<ReadingSessionResponse> {
+  return requestJson<ReadingSessionResponse>("PUT", `/api/reading-sessions/${sessionId}/custom-answers`, {
+    custom_answers: customAnswers,
+  });
+}
+
+export function requestFinalReading(sessionId: string): Promise<FinalReadingResponse> {
+  return requestJson<FinalReadingResponse>("POST", `/api/reading-sessions/${sessionId}/final-reading`);
+}
+
+export function getAccountMe(): Promise<AccountMeResponse> {
+  return requestJson<AccountMeResponse>("GET", "/api/account/me");
+}
+
+export function getAccountOrders(): Promise<AccountOrderResponse[]> {
+  return requestJson<AccountOrderResponse[]>("GET", "/api/account/orders");
+}
+
+export function getAccountReadings(): Promise<AccountReadingResponse[]> {
+  return requestJson<AccountReadingResponse[]>("GET", "/api/account/readings");
 }

@@ -21,7 +21,7 @@ interface InitialFormProps {
   loading: boolean;
   onChange: (profile: InitialProfile) => void;
   onSubmit: () => void;
-  onSajuOnly: () => void;
+  onSajuOnly?: () => void;
 }
 
 interface SelectFieldProps {
@@ -254,21 +254,23 @@ export function InitialForm({ profile, loading, onChange, onSubmit, onSajuOnly }
       </label>
 
       <div className="grid gap-3">
-        <button
-          type="button"
-          onClick={onSajuOnly}
-          disabled={loading}
-          className="flex h-16 w-full items-center justify-center gap-2 rounded-full bg-honey px-5 text-lg font-black text-[#4d3b21] shadow-[0_14px_30px_rgba(241,190,77,0.34)] transition hover:bg-[#f5c85f] disabled:cursor-not-allowed disabled:opacity-70"
-        >
-          만세력 보러가기
-        </button>
+        {onSajuOnly && (
+          <button
+            type="button"
+            onClick={onSajuOnly}
+            disabled={loading}
+            className="flex h-16 w-full items-center justify-center gap-2 rounded-full bg-honey px-5 text-lg font-black text-[#4d3b21] shadow-[0_14px_30px_rgba(241,190,77,0.34)] transition hover:bg-[#f5c85f] disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            만세력 보러가기
+          </button>
+        )}
         <button
           type="submit"
           disabled={loading}
           className="flex h-16 w-full items-center justify-center gap-2 rounded-full bg-[#e9ecef] px-5 text-lg font-black text-stone-700 shadow-[0_12px_24px_rgba(82,70,58,0.08)] transition hover:bg-[#dde8e2] disabled:cursor-not-allowed disabled:opacity-70"
         >
           {loading ? <LoaderCircle className="animate-spin" size={20} aria-hidden /> : <Send size={19} aria-hidden />}
-          {loading ? "무료 서버 응답 대기 중" : "심리 리딩 질문 받기"}
+          {loading ? "처리 중" : "결제 후 리딩 시작"}
         </button>
       </div>
     </form>

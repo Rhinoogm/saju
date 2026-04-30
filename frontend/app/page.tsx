@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { ClipboardCheck, DoorOpen, HeartHandshake, Landmark, LockKeyhole, Settings, X, type LucideIcon } from "lucide-react";
+import type { User } from "@supabase/supabase-js";
+import { ClipboardCheck, DoorOpen, HeartHandshake, Landmark, LoaderCircle, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { InitialForm } from "@/components/InitialForm";
+import { PaymentButton } from "@/components/PaymentButton";
 import { QuestionsForm } from "@/components/QuestionsForm";
 import { ReadingResult } from "@/components/ReadingResult";
-import { SajuOnlyResult } from "@/components/SajuOnlyResult";
+import { UserMenu } from "@/components/UserMenu";
 import {
   ApiError,
   DiagnosticQuestion,
@@ -17,15 +19,17 @@ import {
   InitialProfile,
   QuestionAnswer,
   ReadingStyle,
+  createReadingSession,
   generateCustomQuestions,
   generateQuestions,
   requestFinalReading,
-  requestSajuOnly,
+  saveCustomAnswers,
+  saveFixedAnswers,
 } from "@/lib/api";
+import { getLocalDemoSessionUser, isLocalDemoMode } from "@/lib/localDemo";
+import { createClient } from "@/lib/supabase/client";
 
-type Step = "hall" | "initial" | "fixed" | "custom" | "result" | "saju";
-
-const ADMIN_STORAGE_KEY = "saju_admin_api_key";
+type Step = "hall" | "initial" | "payment" | "fixed" | "custom" | "result";
 
 const readingStyleOptions: {
   style: ReadingStyle;
@@ -58,16 +62,16 @@ const readingStyleOptions: {
 ];
 
 const defaultProfile: InitialProfile = {
-  name: "김경민",
-  gender: "male",
+  name: "",
+  gender: "other",
   initial_concern: "",
   birth: {
     calendar_type: "solar",
     year: 1994,
     month: 1,
-    day: 16,
+    day: 1,
     hour: 12,
-    minute: 20,
+    minute: 0,
     is_leap_month: false,
     city: "Seoul",
     longitude: null,
@@ -97,123 +101,146 @@ function emptyAnswers(questions: DiagnosticQuestion[]): QuestionAnswer[] {
   }));
 }
 
-function apiBaseUrl() {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ??
-    (typeof window === "undefined" ? "http://localhost:8000" : `${window.location.protocol}//${window.location.hostname}:8000`);
-
-  return baseUrl.replace(/\/+$/, "");
-}
-
 export default function Home() {
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [userLoading, setUserLoading] = useState(true);
   const [step, setStep] = useState<Step>("hall");
   const [readingStyle, setReadingStyle] = useState<ReadingStyle>("traditional");
   const [profile, setProfile] = useState<InitialProfile>(defaultProfile);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [questionResult, setQuestionResult] = useState<GenerateQuestionsResponse | null>(null);
   const [fixedAnswers, setFixedAnswers] = useState<QuestionAnswer[]>([]);
   const [customQuestionResult, setCustomQuestionResult] = useState<GenerateCustomQuestionsResponse | null>(null);
   const [customAnswers, setCustomAnswers] = useState<QuestionAnswer[]>([]);
   const [finalResult, setFinalResult] = useState<FinalReadingResponse | null>(null);
-  const [sajuOnlyResult, setSajuOnlyResult] = useState<import("@/lib/api").SajuOnlyResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [adminGateOpen, setAdminGateOpen] = useState(false);
-  const [adminPassword, setAdminPassword] = useState("");
-  const [adminGateLoading, setAdminGateLoading] = useState(false);
-  const [adminGateError, setAdminGateError] = useState("");
 
-  async function handleGenerateQuestions() {
+  useEffect(() => {
+    if (isLocalDemoMode()) {
+      setUser(getLocalDemoSessionUser());
+      setUserLoading(false);
+      const syncDemoSession = () => setUser(getLocalDemoSessionUser());
+      window.addEventListener("storage", syncDemoSession);
+      return () => window.removeEventListener("storage", syncDemoSession);
+    }
+
+    let supabase: ReturnType<typeof createClient>;
+    try {
+      supabase = createClient();
+    } catch {
+      setUser(null);
+      setUserLoading(false);
+      return;
+    }
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+      setUserLoading(false);
+    });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  function handleAuthError(error: unknown, fallback: string) {
+    if (error instanceof ApiError) {
+      if (error.status === 401) {
+        router.push("/login");
+        return "로그인이 필요합니다.";
+      }
+      if (error.status === 402) {
+        setStep("payment");
+        return "결제가 필요합니다.";
+      }
+    }
+    return requestErrorMessage(error, fallback);
+  }
+
+  async function handleCreateSession() {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    if (!profile.name.trim()) {
+      setError("이름을 입력해주세요.");
+      return;
+    }
     if (profile.initial_concern.trim().length === 0) {
-      setError("초기 고민을 적어주세요. (사주만 보려면 ‘사주만 보기’를 눌러도 돼요.)");
+      setError("초기 고민을 적어주세요.");
       return;
     }
     setLoading(true);
     setError("");
     setFinalResult(null);
-    setSajuOnlyResult(null);
 
     try {
-      const response = await generateQuestions(profile);
-      setQuestionResult(response);
-      setFixedAnswers(emptyAnswers(response.questions));
+      const session = await createReadingSession({ ...profile, reading_style: readingStyle });
+      setSessionId(session.id);
+      setQuestionResult(null);
+      setFixedAnswers([]);
       setCustomQuestionResult(null);
       setCustomAnswers([]);
-      setStep("fixed");
+      setStep("payment");
     } catch (error) {
-      setError(requestErrorMessage(error, "질문 생성 중 오류가 발생했어요."));
+      setError(handleAuthError(error, "리딩 세션 생성 중 오류가 발생했어요."));
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleSajuOnly() {
+  async function handlePaid() {
+    if (!sessionId) return;
     setLoading(true);
     setError("");
-    setFinalResult(null);
-    setQuestionResult(null);
-    setFixedAnswers([]);
-    setCustomQuestionResult(null);
-    setCustomAnswers([]);
-
     try {
-      const response = await requestSajuOnly({
-        name: profile.name,
-        gender: profile.gender,
-        birth: profile.birth,
-      });
-      setSajuOnlyResult(response);
-      setStep("saju");
+      const response = await generateQuestions(sessionId);
+      setQuestionResult(response);
+      setFixedAnswers(emptyAnswers(response.questions));
+      setStep("fixed");
     } catch (error) {
-      setError(requestErrorMessage(error, "사주 계산 중 오류가 발생했어요."));
+      setError(handleAuthError(error, "기본 질문 생성 중 오류가 발생했어요."));
     } finally {
       setLoading(false);
     }
   }
 
   async function handleGenerateCustomQuestions() {
-    if (!questionResult) return;
-
+    if (!sessionId || !questionResult) return;
     const completedFixedAnswers = fixedAnswers.filter((answer) => answer.answer.trim().length > 0);
     setLoading(true);
     setError("");
     setFinalResult(null);
 
     try {
-      const response = await generateCustomQuestions({
-        ...profile,
-        category: questionResult.category,
-        fixed_answers: completedFixedAnswers,
-      });
+      await saveFixedAnswers(sessionId, completedFixedAnswers);
+      const response = await generateCustomQuestions(sessionId);
       setCustomQuestionResult(response);
       setCustomAnswers(emptyAnswers(response.questions));
       setStep("custom");
     } catch (error) {
-      setError(requestErrorMessage(error, "맞춤 질문 생성 중 오류가 발생했어요."));
+      setError(handleAuthError(error, "맞춤 질문 생성 중 오류가 발생했어요."));
     } finally {
       setLoading(false);
     }
   }
 
   async function handleFinalReading() {
-    if (!questionResult) return;
-
-    const completedFixedAnswers = fixedAnswers.filter((answer) => answer.answer.trim().length > 0);
+    if (!sessionId) return;
     const completedCustomAnswers = customAnswers.filter((answer) => answer.answer.trim().length > 0);
     setLoading(true);
     setError("");
 
     try {
-      const response = await requestFinalReading({
-        ...profile,
-        category: questionResult.category,
-        reading_style: readingStyle,
-        answers: [...completedFixedAnswers, ...completedCustomAnswers],
-      });
+      await saveCustomAnswers(sessionId, completedCustomAnswers);
+      const response = await requestFinalReading(sessionId);
       setFinalResult(response);
       setStep("result");
     } catch (error) {
-      setError(requestErrorMessage(error, "최종 풀이 생성 중 오류가 발생했어요."));
+      setError(handleAuthError(error, "최종 풀이 생성 중 오류가 발생했어요."));
     } finally {
       setLoading(false);
     }
@@ -222,126 +249,37 @@ export default function Home() {
   function restart() {
     setStep("hall");
     setReadingStyle("traditional");
+    setSessionId(null);
     setQuestionResult(null);
     setFixedAnswers([]);
     setCustomQuestionResult(null);
     setCustomAnswers([]);
     setFinalResult(null);
-    setSajuOnlyResult(null);
     setError("");
   }
 
   function enterReadingStyle(style: ReadingStyle) {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
     setReadingStyle(style);
     setStep("initial");
     setError("");
   }
 
-  async function handleAdminLogin() {
-    const password = adminPassword.trim();
-    setAdminGateError("");
-
-    if (!password) {
-      setAdminGateError("관리 비밀번호를 입력해주세요.");
-      return;
-    }
-
-    setAdminGateLoading(true);
-    try {
-      const response = await fetch(`${apiBaseUrl()}/api/admin/prompts/question_system_prompt`, {
-        headers: {
-          "X-Admin-Key": password,
-        },
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        throw new Error(typeof body?.detail === "string" ? body.detail : "관리 비밀번호를 확인해주세요.");
-      }
-
-      window.localStorage.setItem(ADMIN_STORAGE_KEY, password);
-      router.push("/admin/prompts");
-    } catch (error) {
-      setAdminGateError(error instanceof Error ? error.message : "관리자 페이지에 연결하지 못했어요.");
-    } finally {
-      setAdminGateLoading(false);
-    }
-  }
-
   return (
     <main className="min-h-screen px-4 py-5 sm:px-6 lg:px-8">
-      <button
-        type="button"
-        onClick={() => {
-          setAdminGateOpen(true);
-          setAdminGateError("");
-        }}
-        className="fixed right-4 top-4 z-30 grid h-11 w-11 place-items-center rounded-full border border-stone-200 bg-white text-ink shadow-soft transition hover:border-mint hover:text-mint focus:outline-none focus:ring-4 focus:ring-mint/15"
-        aria-label="관리자 설정 열기"
-        title="관리자 설정"
-      >
-        <Settings size={20} strokeWidth={2.4} aria-hidden="true" />
-      </button>
-
-      {adminGateOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/35 px-4 py-6" role="dialog" aria-modal="true" aria-labelledby="admin-gate-title">
-          <div className="w-full max-w-sm rounded-lg border border-stone-200 bg-white p-5 shadow-soft">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-full bg-mint/10 text-mint">
-                  <LockKeyhole size={19} strokeWidth={2.5} aria-hidden="true" />
-                </div>
-                <div>
-                  <h2 id="admin-gate-title" className="text-lg font-black text-ink">
-                    관리자 설정
-                  </h2>
-                  <p className="mt-1 text-xs font-bold text-stone-500">모델과 프롬프트를 관리합니다.</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAdminGateOpen(false)}
-                className="grid h-9 w-9 place-items-center rounded-full text-stone-500 transition hover:bg-stone-100 hover:text-ink"
-                aria-label="닫기"
-              >
-                <X size={18} strokeWidth={2.4} aria-hidden="true" />
-              </button>
-            </div>
-
-            <label className="mt-5 block">
-              <span className="mb-2 block text-sm font-black text-stone-700">관리 비밀번호</span>
-              <input
-                type="password"
-                value={adminPassword}
-                onChange={(event) => setAdminPassword(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void handleAdminLogin();
-                }}
-                autoComplete="current-password"
-                className="w-full rounded-lg border border-stone-200 bg-cloud px-4 py-3 text-base text-ink outline-none transition focus:border-mint focus:ring-4 focus:ring-mint/15"
-              />
-            </label>
-
-            {adminGateError && <div className="mt-4 rounded-lg border border-coral/20 bg-coral/10 px-4 py-3 text-sm font-bold leading-6 text-coral">{adminGateError}</div>}
-
-            <button
-              type="button"
-              disabled={adminGateLoading}
-              onClick={handleAdminLogin}
-              className="mt-4 h-12 w-full rounded-lg bg-mint px-5 text-sm font-black text-white shadow-soft transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {adminGateLoading ? "확인 중" : "관리자 페이지 열기"}
-            </button>
-          </div>
-        </div>
-      )}
+      <div className="fixed right-4 top-4 z-30">
+        <UserMenu user={user} />
+      </div>
 
       <div className="mx-auto max-w-5xl">
         {step !== "hall" && (
-          <div className="mb-5 grid grid-cols-4 gap-2">
+          <div className="mb-5 grid grid-cols-5 gap-2">
             {[
               ["initial", "입력"],
+              ["payment", "결제"],
               ["fixed", "기본"],
               ["custom", "심층"],
               ["result", "결과"],
@@ -349,21 +287,16 @@ export default function Home() {
               const active = step === key;
               const currentIndex = steps.findIndex(([stepKey]) => stepKey === step);
               const completed = currentIndex > index;
-              return (
-                <div
-                  key={key}
-                  className={`h-2 rounded-full transition ${active || completed ? "bg-honey" : "bg-white/80"}`}
-                  aria-label={`${label} 단계`}
-                />
-              );
+              return <div key={key} className={`h-2 rounded-full transition ${active || completed ? "bg-honey" : "bg-white/80"}`} aria-label={`${label} 단계`} />;
             })}
           </div>
         )}
 
         {error && <div className="mb-4 rounded-lg border border-coral/20 bg-white px-4 py-3 text-sm font-bold leading-6 text-coral shadow-soft">{error}</div>}
-        {loading && (
-          <div className="mb-4 rounded-lg border border-mint/20 bg-white px-4 py-3 text-sm font-bold leading-6 text-mint shadow-soft">
-            잠시 기다려주세요. 선생님이 고객님의 고민을 같이 고민하는 중이에요.
+        {(loading || userLoading) && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-mint/20 bg-white px-4 py-3 text-sm font-bold leading-6 text-mint shadow-soft">
+            <LoaderCircle className="animate-spin" size={17} aria-hidden />
+            잠시 기다려주세요.
           </div>
         )}
 
@@ -373,7 +306,7 @@ export default function Home() {
               <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#fff0b9] px-3 py-1.5 text-xs font-black text-[#6e5428]">
                 <DoorOpen size={14} aria-hidden /> 사주 철학관
               </p>
-              <h1 className="whitespace-nowrap text-2xl font-black leading-tight tracking-normal text-ink sm:text-4xl">원하는 철학관을 선택해주세요.</h1>
+              <h1 className="text-2xl font-black leading-tight tracking-normal text-ink sm:text-4xl">원하는 철학관을 선택해주세요.</h1>
             </div>
 
             <div className="grid gap-4">
@@ -415,8 +348,24 @@ export default function Home() {
                 다시 고르기
               </button>
             </div>
-            <InitialForm profile={profile} loading={loading} onChange={setProfile} onSubmit={handleGenerateQuestions} onSajuOnly={handleSajuOnly} />
+            <InitialForm profile={profile} loading={loading} onChange={setProfile} onSubmit={handleCreateSession} />
           </>
+        )}
+
+        {step === "payment" && sessionId && user && (
+          <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-soft sm:p-6">
+            <p className="text-sm font-black text-mint">결제</p>
+            <h2 className="mt-1 text-2xl font-black text-ink">사주 심화 리딩 1회권</h2>
+            <p className="mt-3 text-sm font-bold leading-6 text-stone-500">결제 검증이 완료되면 기본 질문 생성부터 진행합니다.</p>
+            {isLocalDemoMode() && (
+              <p className="mt-4 rounded-lg border border-honey/40 bg-[#fff8df] px-4 py-3 text-sm font-black leading-6 text-[#6e5428]">
+                로컬 데모 결제 페이지입니다. 실제 결제창을 호출하지 않고 결제 완료 상태로 넘어갑니다.
+              </p>
+            )}
+            <div className="mt-6 max-w-md">
+              <PaymentButton sessionId={sessionId} user={user} onPaid={handlePaid} onError={setError} />
+            </div>
+          </section>
         )}
 
         {step === "fixed" && questionResult && (
@@ -427,7 +376,7 @@ export default function Home() {
             eyebrow={`${questionResult.category_label} · 기본 질문`}
             title="기본 상담지"
             description="초기 고민을 기준으로 고른 카테고리의 기본 질문입니다. 마지막 문항은 비워두어도 됩니다."
-            onBack={() => setStep("initial")}
+            onBack={() => setStep("payment")}
             onAnswerChange={setFixedAnswers}
             onSubmit={handleGenerateCustomQuestions}
             submitLabel="맞춤 질문 받기"
@@ -453,13 +402,7 @@ export default function Home() {
           />
         )}
 
-        {step === "result" && finalResult && (
-          <ReadingResult result={finalResult} profileName={profile.name} onBack={() => setStep("custom")} onRestart={restart} />
-        )}
-
-        {step === "saju" && sajuOnlyResult && (
-          <SajuOnlyResult saju={sajuOnlyResult.saju} onBack={() => setStep("initial")} onRestart={restart} />
-        )}
+        {step === "result" && finalResult && <ReadingResult result={finalResult} profileName={profile.name} onBack={() => setStep("custom")} onRestart={restart} />}
       </div>
     </main>
   );
