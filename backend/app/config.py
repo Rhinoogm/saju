@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     llm_rate_limit_per_ip_per_hour: int = 6
     llm_rate_limit_global_per_minute: int = 25
+    llm_custom_questions_max_output_tokens: int = Field(default=1200, ge=256, le=65536)
+    llm_final_reading_max_output_tokens: int = Field(default=5000, ge=256, le=65536)
+    llm_debug_metrics_enabled: bool = False
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen3:4b"

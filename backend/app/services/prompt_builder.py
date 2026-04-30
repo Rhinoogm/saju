@@ -203,17 +203,12 @@ QUESTION_USER_PROMPT_TEMPLATE = """<objective>
 """
 
 
-FINAL_USER_PROMPT_TEMPLATE = """<system_role>
-당신은 10~40대 여성을 타겟으로 하는 프리미엄 사주 앱 'Saju-i'의 핵심 AI 엔진입니다.
-시스템에 부여된 페르소나(정통형, 공감형, 직설형 중 하나)에 완벽하게 빙의하여, 고객이 감동하고 재방문하게 만드는 치명적이고 매력적인 결과지를 작성해야 합니다.
-</system_role>
-
-<core_directives>
-1. [페르소나 절대 방어]: 시스템 프롬프트의 어조, 성격, 반말/존댓말 여부를 모든 출력 필드에 예외 없이 적용할 것.
-2. [데이터 격리(Anti-Anchoring)]: 사주 전문 용어(십성 등)가 특정 필드를 넘어 다른 필드까지 도배되는 현상을 엄격히 금지함. 아래 <generation_steps>의 데이터 사용 규칙을 반드시 지킬 것.
-3. [고객 리텐션]: 뻔한 위로가 아닌, 고객의 뼈를 때리거나 깊은 공감을 끌어내어 다음 결제(다른 운세 보기)로 자연스럽게 이어지도록 유도할 것.
-4. [내부 사전 계획]: 출력을 생성하기 전, 내부적으로만 사용할 사주 키워드와 사용자 답변 키워드를 필드별로 미리 분배하여 겹치지 않게 계획하라. 이 계획은 절대 JSON에 출력하지 말고 최종 문장에만 반영하라.
-</core_directives>
+FINAL_USER_PROMPT_TEMPLATE = """<task>
+프리미엄 사주 앱 'Saju-i'의 사용자 프로필, 사주 데이터, QnA를 결합해 FinalReadingOutput을 작성한다.
+시스템 페르소나의 어조, 성격, 반말/존댓말 여부, 금지 표현을 모든 필드에 적용한다.
+데이터 격리(Anti-Anchoring): 특정 사주 용어가 여러 필드에 도배되지 않게 한다.
+사주 데이터에 없는 세운, 월운, 사건, 확정 예언은 만들지 않는다.
+</task>
 
 <input_data>
   <user_profile>
@@ -229,64 +224,31 @@ FINAL_USER_PROMPT_TEMPLATE = """<system_role>
   </qna_data>
 </input_data>
 
-<generation_steps>
-각 필드는 다음의 엄격한 매핑 규칙에 따라 작성하라:
+<field_source_mapping>
+- `situation_mirror`: <qna_data>만 사용한다. 사주 용어 없이 사용자의 답변과 초기 고민을 페르소나 관점으로 비춘다.
+- `saju_insight`, `clear_solution`: <saju_data>의 십성, 대운을 중심으로 원인과 행동 기준을 연결한다. 여기서 쓴 사주 용어를 이후 섹션에 반복 도배하지 않는다.
+- `saju_vibe`, `secret_talent`, `luck_recipe`: 감성 레시피 섹션으로, <saju_data>의 일간, 오행을 중심으로 기질, 강점, 일상 팁을 만든다. `luck_recipe.reason`은 명식 근거와 일상 효과를 한 문장 안에 연결한다.
+- `timing_points`, `re_engagement_hook`: <saju_data> 전체에서 서로 다른 근거를 쓴다. `timing_points`는 왜 그 시점의 행동이 맞는지 쉬운 말로 설명하고, `re_engagement_hook`은 이번 고민과 다른 흥미로운 영역을 짧게 연다.
+- `answer_signals`, `answer_signal_summary`, `saju_basis`, `caution`: 전문가 데이터 요약으로, QnA의 핵심 니즈와 실제 명식 근거를 정리한다.
+</field_source_mapping>
 
-공통 구조 규칙:
-- 핵심 리딩 필드 `situation_mirror`, `saju_insight`, `clear_solution`, `saju_vibe`, `secret_talent`는 반드시 `title`, `headline`, `summary`, `detail`만 가진다. `body`를 절대 만들지 않는다.
-- `summary`는 사용자가 처음 보게 될 1~2문장의 압축 요약으로 작성한다.
-- `detail`은 버튼을 눌렀을 때 읽을 상세 리딩으로, summary보다 최소 3배 이상 길고 구체적인 5~7문장으로 작성한다. 판단 근거, 사용자 답변 또는 명식 데이터와의 연결, 실제 생활에서 어떻게 드러나는지, 바로 적용할 기준을 모두 포함한다.
-- 단일/배열 필드 `answer_signals`, `answer_signal_summary`, `timing_points`, `luck_recipe`, `saju_basis`, `caution`에는 summary/detail 구조를 적용하지 말고 JSON Schema 그대로 작성한다.
-- `re_engagement_hook`은 핵심 리딩 필드가 아니므로 예외적으로 `title`, `body`만 가진다. 여기에 `summary`나 `detail`을 만들지 않는다.
-- `caution`은 객체가 아니라 문자열 필드다. `title`, `body`, `summary`, `detail` 같은 하위 키를 만들지 않는다.
-
-Step 1. 상황 분석 및 공감
-- target_field: `situation_mirror`
-- data_source: <qna_data>
-- rule: 사주 용어 사용 금지. 사용자의 QnA 답변을 인용하여 그 이면의 진짜 마음을 페르소나의 시각으로 분석할 것.
-
-Step 2. 명리 기반 원인과 해결책
-- target_field: `saju_insight`, `clear_solution`
-- data_source: <saju_data> 중 '십성', '대운' 중심
-- rule: 현재 고민의 원인을 십성/대운으로 명쾌하게 짚고, 당장 해야 할 행동을 단호하게 제시할 것. (이후 섹션에서 여기서 쓴 사주 용어 재사용 금지)
-
-Step 3. 사주 기질 및 일상 팁 (감성 레시피)
-- target_field: `saju_vibe`, `secret_talent`, `luck_recipe`
-- data_source: <saju_data> 중 '일간', '오행' 중심
-- rule: `luck_recipe`의 reason은 항상 "명식의 어떤 부분 때문에 이 행동/색/음식/아이템이 도움이 되는지"를 쉬운 말로 풀어 쓸 것. 사주 전문 용어만 던지지 말고, 예를 들어 "불 기운이 강해 마음이 빨리 달아오르기 쉬우니 차분한 색이 속도를 낮춰준다"처럼 명식 근거와 일상 효과를 한 문장 안에 연결하라. `saju_vibe`는 자연 물상(비유)으로만 아름답게 표현할 것.
-
-Step 4. 타이밍 및 재방문 훅 (리텐션)
-- target_field: `timing_points`, `re_engagement_hook`
-- data_source: <saju_data> 전체 활용
-- rule: `timing_points` 3가지는 각기 다른 근거(하나는 일간, 하나는 대운 등)를 쓰고, 매 항목마다 "사주의 어떤 부분 때문에 이 시점에 이런 행동/기대가 도움이 되는지"를 쉬운 말로 반드시 설명할 것. `re_engagement_hook`은 사용자의 명식 중 이번 고민과 전혀 다른 영역(예: 연애운, 숨겨진 재물운 등)의 매력적인 글자를 언급하며 다음 검사를 유도하는 미끼를 던질 것.
-
-Step 5. 전문가 데이터 요약
-- target_field: `answer_signals`, `answer_signal_summary`, `saju_basis`, `caution`
-- rule: QnA 답변에서 핵심 니즈 키워드를 뽑고, 이를 바넘 효과(Barnum effect)를 일으키는 1문장으로 요약할 것.
-</generation_steps>
-
-<output_format>
-제공된 JSON Schema와 정확히 일치하는 JSON 객체만 반환하라.
-</output_format>
+<structure_rules>
+- `situation_mirror`, `saju_insight`, `clear_solution`, `saju_vibe`, `secret_talent`: `title`, `headline`, `summary`, `detail`만 사용하고 `body`를 절대 만들지 않는다.
+- `re_engagement_hook`은 핵심 리딩 필드가 아니므로 예외적으로 `title`, `body`만 가진다.
+- `answer_signals`, `answer_signal_summary`, `timing_points`, `luck_recipe`, `saju_basis`, `caution`: 스키마의 타입 그대로 작성한다.
+- `caution`은 객체가 아니라 문자열 필드다.
+- 내부적으로만 사용할 사주 키워드와 사용자 답변 키워드를 필드별로 분배해 같은 표현이 여러 섹션에 반복되지 않게 한다.
+- 제공된 JSON Schema와 정확히 일치하는 JSON 객체만 반환한다.
+</structure_rules>
 """
 
 
 FINAL_OUTPUT_BUDGET_PROMPT = """<budget_and_quality_control>
-출력 생성 시 다음 규칙을 최종 검수(Validation) 하라. 위반 시 시스템 오류로 간주함.
-
-1. [구조 완결성]: 전체 JSON을 반드시 완결된 형태로 닫을 것.
-2. [정량 준수]:
-   - answer_signals: 3개
-   - saju_basis: 3개
-   - timing_points: 3개
-   - luck_recipe: 4개 (reason은 명식 근거와 도움이 되는 이유를 쉬운 말로 한 호흡에 연결해 작성)
-3. [길이 통제 (JSON 최적화)]:
-   - 핵심 리딩 5개 필드의 summary: 기본 1~2문장. 공감형 페르소나에서 감탄사나 이모지가 들어가면 3문장까지 허용하되, 스마트폰 화면에서 짧게 보이는 호흡을 유지한다.
-   - situation_mirror.detail, saju_insight.detail, clear_solution.detail: 5~7문장. 짧은 단문만 나열하지 말고 근거와 행동 기준이 충분히 이어지게 쓴다.
-   - saju_vibe.detail, secret_talent.detail: 4~6문장. 비유와 강점 설명이 잘리지 않게 쓰되 장황한 반복은 금지한다.
-   - re_engagement_hook.body: 정확히 2문장. 다음 검사를 보고 싶게 만드는 짧은 모바일 카드 문장으로 쓴다.
-   - answer_signal_summary: 1문장. 최대 3개의 마침표 안에서 핵심 니즈를 한눈에 읽히게 쓴다.
-4. [도배 방지 최종 확인]: Step 2(이유/해결책)에서 지목한 특정 사주 기운(십성 등)이 Step 3(레시피)나 Step 4(타이밍)에 앵무새처럼 똑같이 반복되지 않았는지 확인하라. 출력 직전 내부 계획과 비교해 필드별 키워드가 겹치면 다른 근거와 어휘로 교체하라.
+- 전체 JSON을 완결된 형태로 닫는다.
+- answer_signals 3개, saju_basis 3개, timing_points 3개, luck_recipe 4개를 작성한다.
+- 핵심 리딩 5개 필드의 summary는 1~2문장으로 쓰되, 공감형에서 감탄사나 이모지가 들어가면 3문장까지 허용한다. 스마트폰 화면에서 짧게 보이는 호흡을 유지하고, detail은 충분한 근거와 행동 기준을 담은 4~7문장으로 쓴다.
+- re_engagement_hook.body는 정확히 2문장, answer_signal_summary는 최대 3개의 마침표 안에서 1문장으로 쓴다.
+- 특정 십성/오행/대운 표현이 여러 섹션에 반복되면 다른 실제 근거와 어휘로 바꾼다.
 </budget_and_quality_control>
 """
 

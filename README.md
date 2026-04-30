@@ -45,6 +45,9 @@ GROQ_MODEL=llama-3.1-8b-instant
 GROQ_RESPONSE_FORMAT_MODE=auto
 GROQ_MAX_COMPLETION_TOKENS=5000
 GROQ_MAX_REQUEST_TOKENS=6000
+LLM_CUSTOM_QUESTIONS_MAX_OUTPUT_TOKENS=1200
+LLM_FINAL_READING_MAX_OUTPUT_TOKENS=5000
+LLM_DEBUG_METRICS_ENABLED=false
 ```
 
 `auto`는 Groq에서 strict JSON Schema를 지원하는 모델(`openai/gpt-oss-20b`, `openai/gpt-oss-120b`)에는 `json_schema`를 사용하고, 그 외 모델에는 `json_object`를 사용합니다. strict schema를 직접 쓰려면 지원 모델로 `GROQ_MODEL`을 바꾸거나 `GROQ_RESPONSE_FORMAT_MODE=json_schema`를 지정하세요.
@@ -57,9 +60,13 @@ GEMINI_API_KEY=your_gemini_api_key
 GEMINI_MODEL=gemini-2.5-flash
 GEMINI_RESPONSE_SCHEMA_MODE=json_schema
 GEMINI_MAX_OUTPUT_TOKENS=5000
+LLM_CUSTOM_QUESTIONS_MAX_OUTPUT_TOKENS=1200
+LLM_FINAL_READING_MAX_OUTPUT_TOKENS=5000
+LLM_DEBUG_METRICS_ENABLED=false
 ```
 
 Gemini provider는 Google AI Studio의 Gemini API `generateContent` REST endpoint를 호출하며, 기본값으로 `responseMimeType=application/json`과 `responseJsonSchema`를 사용합니다.
+`LLM_DEBUG_METRICS_ENABLED=true`를 켜면 LLM 응답에 `X-LLM-Duration-Ms`, `X-LLM-Prompt-Tokens`, `X-LLM-Completion-Tokens`, `X-LLM-Provider-Cache`, `Server-Timing` 같은 디버그 헤더가 붙어 Network 탭과 서버 로그에서 토큰/속도 변화를 확인할 수 있습니다.
 
 ## 프론트엔드 실행
 
