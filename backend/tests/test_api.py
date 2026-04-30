@@ -6,7 +6,12 @@ from app.config import Settings, get_settings
 from app.api.routes.saju import get_llm_provider
 from app.main import app, create_app
 from app.services.llm.base import LLMRateLimitError, LLMResponse
-from app.services.prompt_builder import FINAL_USER_PROMPT_TEMPLATE
+from app.services.prompt_builder import (
+    FINAL_SYSTEM_PROMPT_DIRECT,
+    FINAL_SYSTEM_PROMPT_EMPATHETIC,
+    FINAL_SYSTEM_PROMPT_TRADITIONAL,
+    FINAL_USER_PROMPT_TEMPLATE,
+)
 from app.services.prompt_store import PromptStore
 from app.services.rate_limiter import InMemoryRateLimiter
 from app.services.runtime_settings import resolve_runtime_llm_settings
@@ -111,30 +116,87 @@ FINAL_PAYLOAD = {
 
 class MockProvider:
     def __init__(self) -> None:
-        self.calls: list[dict[str, str]] = []
+        self.calls: list[dict] = []
 
-    async def generate(self, *, system: str, prompt: str, schema: dict, schema_name: str) -> LLMResponse:
+    async def generate(
+        self,
+        *,
+        system: str,
+        prompt: str,
+        schema: dict,
+        schema_name: str,
+        max_output_tokens: int | None = None,
+    ) -> LLMResponse:
         assert system.strip()
         assert prompt.strip()
         assert schema_name in {"QuestionGenerationOutput", "FinalReadingOutput"}
         assert schema["type"] == "object"
-        self.calls.append({"system": system, "prompt": prompt, "schema_name": schema_name})
+        self.calls.append({"system": system, "prompt": prompt, "schema_name": schema_name, "max_output_tokens": max_output_tokens})
         content = CUSTOM_QUESTION_PAYLOAD if schema_name == "QuestionGenerationOutput" else FINAL_PAYLOAD
         return LLMResponse(
             content=json.dumps(content, ensure_ascii=False),
             model="test-model",
             provider="mock",
-            raw_metadata={"done": True},
+            raw_metadata={
+                "done": True,
+                "usage": {"prompt_tokens": 111, "completion_tokens": 222, "total_tokens": 333},
+                "choices": [{"finish_reason": "stop"}],
+                "provider_internal": {"large": True},
+            },
+        )
+
+
+class GroqMetadataProvider:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    async def generate(
+        self,
+        *,
+        system: str,
+        prompt: str,
+        schema: dict,
+        schema_name: str,
+        max_output_tokens: int | None = None,
+    ) -> LLMResponse:
+        self.calls.append({"system": system, "prompt": prompt, "schema_name": schema_name, "max_output_tokens": max_output_tokens})
+        content = CUSTOM_QUESTION_PAYLOAD if schema_name == "QuestionGenerationOutput" else FINAL_PAYLOAD
+        return LLMResponse(
+            content=json.dumps(content, ensure_ascii=False),
+            model="groq-test-model",
+            provider="groq",
+            raw_metadata={
+                "id": "chatcmpl-test",
+                "usage": {"prompt_tokens": 11, "completion_tokens": 22, "total_tokens": 33},
+                "choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}],
+                "system_fingerprint": "provider-internal",
+            },
         )
 
 
 class InvalidJsonProvider:
-    async def generate(self, *, system: str, prompt: str, schema: dict, schema_name: str) -> LLMResponse:
+    async def generate(
+        self,
+        *,
+        system: str,
+        prompt: str,
+        schema: dict,
+        schema_name: str,
+        max_output_tokens: int | None = None,
+    ) -> LLMResponse:
         return LLMResponse(content="not json", model="test-model", provider="mock")
 
 
 class RateLimitedProvider:
-    async def generate(self, *, system: str, prompt: str, schema: dict, schema_name: str) -> LLMResponse:
+    async def generate(
+        self,
+        *,
+        system: str,
+        prompt: str,
+        schema: dict,
+        schema_name: str,
+        max_output_tokens: int | None = None,
+    ) -> LLMResponse:
         raise LLMRateLimitError("Groq API limit reached: token rate limit exceeded (type=rate_limit_error)")
 
 
@@ -142,13 +204,29 @@ class AlwaysInvalidFinalReadingProvider:
     def __init__(self) -> None:
         self.calls = 0
 
-    async def generate(self, *, system: str, prompt: str, schema: dict, schema_name: str) -> LLMResponse:
+    async def generate(
+        self,
+        *,
+        system: str,
+        prompt: str,
+        schema: dict,
+        schema_name: str,
+        max_output_tokens: int | None = None,
+    ) -> LLMResponse:
         self.calls += 1
         return LLMResponse(content='{"reading_title":"끊긴 응답","situation_mirror":{"title":"중간에서', model="test-model", provider="mock")
 
 
 class SchemaInvalidFinalReadingProvider:
-    async def generate(self, *, system: str, prompt: str, schema: dict, schema_name: str) -> LLMResponse:
+    async def generate(
+        self,
+        *,
+        system: str,
+        prompt: str,
+        schema: dict,
+        schema_name: str,
+        max_output_tokens: int | None = None,
+    ) -> LLMResponse:
         payload = {**FINAL_PAYLOAD, "luck_recipe": FINAL_PAYLOAD["luck_recipe"][:2]}
         return LLMResponse(content=json.dumps(payload, ensure_ascii=False), model="test-model", provider="mock")
 
@@ -241,6 +319,87 @@ def test_generate_custom_questions_happy_path() -> None:
     assert body["questions"][3]["id"] == "q8"
     assert body["questions"][3]["type"] == "short_text"
     assert body["meta"]["provider"] == "mock"
+    assert provider.calls[-1]["max_output_tokens"] == 1200
+
+
+def test_response_meta_slims_provider_raw_metadata() -> None:
+    original_limiter = app.state.llm_rate_limiter
+    app.state.llm_rate_limiter = None
+    provider = GroqMetadataProvider()
+    app.dependency_overrides[get_llm_provider] = lambda: provider
+    client = TestClient(app)
+
+    try:
+        response = client.post(
+            "/api/generate-custom-questions",
+            json={**initial_payload(), "category": "career", "fixed_answers": fixed_answer_payload()},
+        )
+    finally:
+        app.dependency_overrides.clear()
+        app.state.llm_rate_limiter = original_limiter
+
+    assert response.status_code == 200
+    raw_metadata = response.json()["meta"]["raw_metadata"]
+    assert raw_metadata == {
+        "usage": {"prompt_tokens": 11, "completion_tokens": 22, "total_tokens": 33},
+        "finish_reason": "stop",
+    }
+    assert "choices" not in raw_metadata
+    assert "system_fingerprint" not in raw_metadata
+
+
+def test_llm_debug_metrics_headers_when_enabled(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("LLM_DEBUG_METRICS_ENABLED", "true")
+    monkeypatch.setenv("ENABLE_ADMIN_PROMPTS", "false")
+    monkeypatch.setenv("PROMPTS_DB_PATH", str(tmp_path / "prompts.sqlite3"))
+    get_settings.cache_clear()
+
+    try:
+        enabled_app = create_app()
+        enabled_app.state.llm_rate_limiter = None
+        provider = GroqMetadataProvider()
+        enabled_app.dependency_overrides[get_llm_provider] = lambda: provider
+        with TestClient(enabled_app) as client:
+            response = client.post(
+                "/api/generate-custom-questions",
+                json={**initial_payload(), "category": "career", "fixed_answers": fixed_answer_payload()},
+            )
+    finally:
+        get_settings.cache_clear()
+
+    assert response.status_code == 200
+    assert response.headers["X-LLM-Prompt-Tokens"] == "11"
+    assert response.headers["X-LLM-Completion-Tokens"] == "22"
+    assert response.headers["X-LLM-Total-Tokens"] == "33"
+    assert response.headers["X-LLM-Max-Output-Tokens"] == "1200"
+    assert response.headers["X-LLM-Provider-Cache"] == "unknown"
+    assert response.headers["Server-Timing"].startswith("llm;dur=")
+    assert int(response.headers["X-LLM-Prompt-Chars"]) > 0
+    assert int(response.headers["X-LLM-Estimated-Prompt-Tokens"]) > 0
+
+
+def test_llm_debug_metrics_headers_disabled_by_default(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("LLM_DEBUG_METRICS_ENABLED", "false")
+    monkeypatch.setenv("ENABLE_ADMIN_PROMPTS", "false")
+    monkeypatch.setenv("PROMPTS_DB_PATH", str(tmp_path / "prompts.sqlite3"))
+    get_settings.cache_clear()
+    provider = GroqMetadataProvider()
+
+    try:
+        disabled_app = create_app()
+        disabled_app.state.llm_rate_limiter = None
+        disabled_app.dependency_overrides[get_llm_provider] = lambda: provider
+        with TestClient(disabled_app) as client:
+            response = client.post(
+                "/api/generate-custom-questions",
+                json={**initial_payload(), "category": "career", "fixed_answers": fixed_answer_payload()},
+            )
+    finally:
+        get_settings.cache_clear()
+
+    assert response.status_code == 200
+    assert "X-LLM-Duration-Ms" not in response.headers
+    assert "Server-Timing" not in response.headers
 
 
 def test_generate_questions_rate_limit() -> None:
@@ -339,6 +498,15 @@ def test_admin_prompt_keeps_custom_final_user_prompt(monkeypatch, tmp_path) -> N
 
     assert response.status_code == 200
     assert response.json()["content"] == custom_prompt
+
+
+def test_default_final_prompt_keeps_personas_and_removes_redundant_internal_goals() -> None:
+    assert "프리미엄 명리 심리 상담가" in FINAL_SYSTEM_PROMPT_TRADITIONAL
+    assert "극F 성향의 사주 과몰입 찐 언니" in FINAL_SYSTEM_PROMPT_EMPATHETIC
+    assert "싸가지 없는 천재 명리학자" in FINAL_SYSTEM_PROMPT_DIRECT
+    assert "고객 리텐션" not in FINAL_USER_PROMPT_TEMPLATE
+    assert "field_source_mapping" in FINAL_USER_PROMPT_TEMPLATE
+    assert FINAL_USER_PROMPT_TEMPLATE.count("JSON Schema") == 1
 
 
 def test_admin_llm_settings_round_trip(monkeypatch, tmp_path) -> None:
@@ -465,6 +633,7 @@ def test_final_reading_happy_path() -> None:
     assert len(body["reading"]["luck_recipe"]) == 4
     assert len(body["reading"]["saju_basis"]) == 3
     assert len(body["reading"]["timing_points"]) == 3
+    assert provider.calls[-1]["max_output_tokens"] == 5000
 
 
 def test_final_reading_defaults_to_traditional_reading_style() -> None:

@@ -71,6 +71,55 @@ async def test_gemini_sends_response_json_schema() -> None:
 
 
 @pytest.mark.asyncio
+async def test_gemini_reuses_injected_async_client_without_closing_it() -> None:
+    requests: list[httpx.Request] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return _generate_content_response(model="gemini-reused-client")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = GeminiProvider(
+            api_key="test-key",
+            base_url="http://gemini.test/v1beta",
+            client=client,
+        )
+
+        await provider.generate(system="system", prompt="prompt", schema={"type": "object"}, schema_name="TestSchema")
+        await provider.generate(system="system", prompt="prompt", schema={"type": "object"}, schema_name="TestSchema")
+
+        assert len(requests) == 2
+        assert client.is_closed is False
+
+
+@pytest.mark.asyncio
+async def test_gemini_uses_per_call_max_output_token_override() -> None:
+    captured: dict = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured["payload"] = request.content
+        return _generate_content_response()
+
+    provider = GeminiProvider(
+        api_key="test-key",
+        base_url="http://gemini.test/v1beta",
+        max_output_tokens=5000,
+        transport=httpx.MockTransport(handler),
+    )
+
+    await provider.generate(
+        system="system",
+        prompt="prompt",
+        schema={"type": "object"},
+        schema_name="TestSchema",
+        max_output_tokens=1200,
+    )
+
+    payload = json.loads(captured["payload"])
+    assert payload["generationConfig"]["maxOutputTokens"] == 1200
+
+
+@pytest.mark.asyncio
 async def test_gemini_requires_api_key() -> None:
     provider = GeminiProvider(api_key=None)
 

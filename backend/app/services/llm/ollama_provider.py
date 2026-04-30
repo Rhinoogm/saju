@@ -37,6 +37,7 @@ class OllamaProvider:
         temperature: float = 0.4,
         format_mode: Literal["auto", "schema", "json", "none"] = "auto",
         num_predict: int | None = 4096,
+        client: httpx.AsyncClient | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
@@ -45,6 +46,7 @@ class OllamaProvider:
         self.temperature = temperature
         self.format_mode = format_mode
         self.num_predict = num_predict
+        self.client = client
         self.transport = transport
 
     @property
@@ -59,7 +61,9 @@ class OllamaProvider:
         system: str,
         prompt: str,
         schema: dict[str, Any],
+        max_output_tokens: int | None = None,
     ) -> dict[str, Any]:
+        effective_num_predict = self.num_predict if max_output_tokens is None else max_output_tokens
         payload: dict[str, Any] = {
             "model": self.model,
             "system": system,
@@ -69,8 +73,8 @@ class OllamaProvider:
                 "temperature": self.temperature,
             },
         }
-        if self.num_predict is not None:
-            payload["options"]["num_predict"] = self.num_predict
+        if effective_num_predict is not None:
+            payload["options"]["num_predict"] = effective_num_predict
 
         if self.format_mode == "none":
             return payload
@@ -85,6 +89,36 @@ class OllamaProvider:
         payload["format"] = schema
         return payload
 
+    @staticmethod
+    async def _read_stream_response(response: httpx.Response) -> tuple[list[str], dict[str, Any]]:
+        if not response.is_success:
+            error_text = await _response_error_text(response)
+            raise LLMProviderError(f"Ollama returned HTTP {response.status_code}: {error_text}")
+
+        content_chunks: list[str] = []
+        metadata: dict[str, Any] = {}
+        async for line in response.aiter_lines():
+            if not line.strip():
+                continue
+
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise LLMProviderError(f"Ollama returned invalid stream JSON: {line[:300]}") from exc
+
+            error = event.get("error")
+            if isinstance(error, str) and error:
+                raise LLMProviderError(f"Ollama returned an error: {error}")
+
+            chunk = event.get("response")
+            if isinstance(chunk, str):
+                content_chunks.append(chunk)
+
+            if event.get("done") is True:
+                metadata = {key: value for key, value in event.items() if key != "response"}
+
+        return content_chunks, metadata
+
     async def generate(
         self,
         *,
@@ -92,44 +126,30 @@ class OllamaProvider:
         prompt: str,
         schema: dict[str, Any],
         schema_name: str,
+        max_output_tokens: int | None = None,
     ) -> LLMResponse:
         attempted_fallback = False
-        payload = self._build_payload(system=system, prompt=prompt, schema=schema)
+        payload = self._build_payload(system=system, prompt=prompt, schema=schema, max_output_tokens=max_output_tokens)
+        effective_num_predict = self.num_predict if max_output_tokens is None else max_output_tokens
 
         while True:
-            content_chunks: list[str] = []
-            metadata: dict[str, Any] = {}
-
             try:
-                client_options: dict[str, Any] = {"timeout": self.timeout_seconds}
-                if self.transport is not None:
-                    client_options["transport"] = self.transport
+                if self.client is not None:
+                    async with self.client.stream(
+                        "POST",
+                        self.endpoint,
+                        json=payload,
+                        timeout=self.timeout_seconds,
+                    ) as response:
+                        content_chunks, metadata = await self._read_stream_response(response)
+                else:
+                    client_options: dict[str, Any] = {"timeout": self.timeout_seconds}
+                    if self.transport is not None:
+                        client_options["transport"] = self.transport
 
-                async with httpx.AsyncClient(**client_options) as client:
-                    async with client.stream("POST", self.endpoint, json=payload) as response:
-                        if not response.is_success:
-                            error_text = await _response_error_text(response)
-                            raise LLMProviderError(f"Ollama returned HTTP {response.status_code}: {error_text}")
-
-                        async for line in response.aiter_lines():
-                            if not line.strip():
-                                continue
-
-                            try:
-                                event = json.loads(line)
-                            except json.JSONDecodeError as exc:
-                                raise LLMProviderError(f"Ollama returned invalid stream JSON: {line[:300]}") from exc
-
-                            error = event.get("error")
-                            if isinstance(error, str) and error:
-                                raise LLMProviderError(f"Ollama returned an error: {error}")
-
-                            chunk = event.get("response")
-                            if isinstance(chunk, str):
-                                content_chunks.append(chunk)
-
-                            if event.get("done") is True:
-                                metadata = {key: value for key, value in event.items() if key != "response"}
+                    async with httpx.AsyncClient(**client_options) as client:
+                        async with client.stream("POST", self.endpoint, json=payload) as response:
+                            content_chunks, metadata = await self._read_stream_response(response)
             except httpx.TimeoutException as exc:
                 raise LLMTimeoutError("Ollama request timed out") from exc
             except httpx.HTTPStatusError as exc:
@@ -156,8 +176,8 @@ class OllamaProvider:
 
             if metadata.get("done_reason") == "length":
                 limit_hint = (
-                    f"OLLAMA_NUM_PREDICT={self.num_predict}"
-                    if self.num_predict is not None
+                    f"OLLAMA_NUM_PREDICT={effective_num_predict}"
+                    if effective_num_predict is not None
                     else "the configured Ollama num_predict limit"
                 )
                 raise LLMProviderError(

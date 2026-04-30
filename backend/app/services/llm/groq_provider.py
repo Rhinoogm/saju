@@ -46,6 +46,7 @@ class GroqProvider:
         json_schema_strict: bool = True,
         max_completion_tokens: int | None = 5000,
         max_request_tokens: int | None = 6000,
+        client: httpx.AsyncClient | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
         sleep: Callable[[float], Awaitable[None]] | None = None,
     ) -> None:
@@ -58,6 +59,7 @@ class GroqProvider:
         self.json_schema_strict = json_schema_strict
         self.max_completion_tokens = max_completion_tokens
         self.max_request_tokens = max_request_tokens
+        self.client = client
         self.transport = transport
         self.sleep = sleep or asyncio.sleep
 
@@ -125,9 +127,15 @@ class GroqProvider:
         serialized = json.dumps(payload_without_completion, ensure_ascii=False, separators=(",", ":"))
         return cls._estimate_text_tokens(serialized)
 
-    def _fit_completion_budget(self, payload: dict[str, Any], *, request_token_budget: int | None = None) -> None:
+    def _fit_completion_budget(
+        self,
+        payload: dict[str, Any],
+        *,
+        request_token_budget: int | None = None,
+        max_completion_tokens: int | None = None,
+    ) -> None:
         max_request_tokens = self.max_request_tokens if request_token_budget is None else request_token_budget
-        if self.max_completion_tokens is None or max_request_tokens is None:
+        if max_completion_tokens is None or max_request_tokens is None:
             return
 
         prompt_tokens = self._estimate_payload_tokens(payload)
@@ -140,7 +148,7 @@ class GroqProvider:
                 "Shorten the prompt or raise GROQ_MAX_REQUEST_TOKENS for a higher Groq tier."
             )
 
-        payload["max_completion_tokens"] = min(self.max_completion_tokens, available_completion_tokens)
+        payload["max_completion_tokens"] = min(max_completion_tokens, available_completion_tokens)
 
     def _build_payload(
         self,
@@ -151,6 +159,7 @@ class GroqProvider:
         schema_name: str,
         response_format: dict[str, Any] | None | object = _DEFAULT_RESPONSE_FORMAT,
         request_token_budget: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> dict[str, Any]:
         resolved_response_format = (
             self._response_format(schema=schema, schema_name=schema_name)
@@ -171,11 +180,16 @@ class GroqProvider:
             ],
             "temperature": self.temperature,
         }
-        if self.max_completion_tokens is not None:
-            payload["max_completion_tokens"] = self.max_completion_tokens
+        effective_max_completion_tokens = self.max_completion_tokens if max_output_tokens is None else max_output_tokens
+        if effective_max_completion_tokens is not None:
+            payload["max_completion_tokens"] = effective_max_completion_tokens
         if isinstance(resolved_response_format, dict):
             payload["response_format"] = resolved_response_format
-        self._fit_completion_budget(payload, request_token_budget=request_token_budget)
+        self._fit_completion_budget(
+            payload,
+            request_token_budget=request_token_budget,
+            max_completion_tokens=effective_max_completion_tokens,
+        )
         return payload
 
     @staticmethod
@@ -280,28 +294,45 @@ class GroqProvider:
         prompt: str,
         schema: dict[str, Any],
         schema_name: str,
+        max_output_tokens: int | None = None,
     ) -> LLMResponse:
         if not self.api_key:
             raise LLMProviderError("GROQ_API_KEY is required when LLM_PROVIDER=groq")
 
-        payload = self._build_payload(system=system, prompt=prompt, schema=schema, schema_name=schema_name)
+        payload = self._build_payload(
+            system=system,
+            prompt=prompt,
+            schema=schema,
+            schema_name=schema_name,
+            max_output_tokens=max_output_tokens,
+        )
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        effective_max_completion_tokens = self.max_completion_tokens if max_output_tokens is None else max_output_tokens
         attempted_json_object_fallback = False
         attempted_tpm_budget_fallback = False
         attempted_rate_limit_wait = False
 
         while True:
             try:
-                client_options: dict[str, Any] = {"timeout": self.timeout_seconds}
-                if self.transport is not None:
-                    client_options["transport"] = self.transport
-
-                async with httpx.AsyncClient(**client_options) as client:
-                    response = await client.post(f"{self.base_url}/chat/completions", headers=headers, json=payload)
+                if self.client is not None:
+                    response = await self.client.post(
+                        f"{self.base_url}/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=self.timeout_seconds,
+                    )
                     response.raise_for_status()
+                else:
+                    client_options: dict[str, Any] = {"timeout": self.timeout_seconds}
+                    if self.transport is not None:
+                        client_options["transport"] = self.transport
+
+                    async with httpx.AsyncClient(**client_options) as client:
+                        response = await client.post(f"{self.base_url}/chat/completions", headers=headers, json=payload)
+                        response.raise_for_status()
                 break
             except httpx.TimeoutException as exc:
                 raise LLMTimeoutError("Groq request timed out") from exc
@@ -317,6 +348,7 @@ class GroqProvider:
                         schema_name=schema_name,
                         response_format=payload.get("response_format"),
                         request_token_budget=request_tpm_limit,
+                        max_output_tokens=max_output_tokens,
                     )
                     continue
                 if self._is_quota_or_rate_limit_response(exc.response.status_code, error_text):
@@ -346,6 +378,7 @@ class GroqProvider:
                         schema=schema,
                         schema_name=schema_name,
                         response_format={"type": _JSON_OBJECT_RESPONSE_FORMAT},
+                        max_output_tokens=max_output_tokens,
                     )
                     continue
                 raise LLMProviderError(f"Groq returned HTTP {exc.response.status_code}: {error_text}") from exc
@@ -361,8 +394,8 @@ class GroqProvider:
 
         if isinstance(choice, dict) and choice.get("finish_reason") == "length":
             limit_hint = (
-                f"GROQ_MAX_COMPLETION_TOKENS={self.max_completion_tokens}"
-                if self.max_completion_tokens is not None
+                f"GROQ_MAX_COMPLETION_TOKENS={effective_max_completion_tokens}"
+                if effective_max_completion_tokens is not None
                 else "the configured Groq completion token limit"
             )
             raise LLMProviderError(

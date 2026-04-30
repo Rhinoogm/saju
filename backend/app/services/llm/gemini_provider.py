@@ -32,11 +32,12 @@ class GeminiProvider:
         *,
         api_key: str | None,
         base_url: str = "https://generativelanguage.googleapis.com/v1beta",
-        model: str = "gemini-2.5-flash",
+        model: str = "gemini-3.1-flash-lite-preview",
         timeout_seconds: float = 60.0,
         temperature: float = 0.25,
         response_schema_mode: Literal["json_schema", "json", "none"] = "json_schema",
         max_output_tokens: int | None = 5000,
+        client: httpx.AsyncClient | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
         max_transient_retries: int = 2,
         transient_retry_seconds: float = _DEFAULT_TRANSIENT_RETRY_SECONDS,
@@ -49,6 +50,7 @@ class GeminiProvider:
         self.temperature = temperature
         self.response_schema_mode = response_schema_mode
         self.max_output_tokens = max_output_tokens
+        self.client = client
         self.transport = transport
         self.max_transient_retries = max(0, max_transient_retries)
         self.transient_retry_seconds = max(0.0, transient_retry_seconds)
@@ -123,13 +125,22 @@ class GeminiProvider:
             merged["type"] = [non_null_type, "null"]
         return merged
 
-    def _build_payload(self, *, system: str, prompt: str, schema: dict[str, Any], schema_name: str) -> dict[str, Any]:
+    def _build_payload(
+        self,
+        *,
+        system: str,
+        prompt: str,
+        schema: dict[str, Any],
+        schema_name: str,
+        max_output_tokens: int | None = None,
+    ) -> dict[str, Any]:
         user_prompt = prompt
         generation_config: dict[str, Any] = {
             "temperature": self.temperature,
         }
-        if self.max_output_tokens is not None:
-            generation_config["maxOutputTokens"] = self.max_output_tokens
+        effective_max_output_tokens = self.max_output_tokens if max_output_tokens is None else max_output_tokens
+        if effective_max_output_tokens is not None:
+            generation_config["maxOutputTokens"] = effective_max_output_tokens
 
         if self.response_schema_mode == "json_schema":
             generation_config["responseMimeType"] = "application/json"
@@ -231,26 +242,43 @@ class GeminiProvider:
         prompt: str,
         schema: dict[str, Any],
         schema_name: str,
+        max_output_tokens: int | None = None,
     ) -> LLMResponse:
         if not self.api_key:
             raise LLMProviderError("GEMINI_API_KEY is required when LLM_PROVIDER=gemini")
 
-        payload = self._build_payload(system=system, prompt=prompt, schema=schema, schema_name=schema_name)
+        payload = self._build_payload(
+            system=system,
+            prompt=prompt,
+            schema=schema,
+            schema_name=schema_name,
+            max_output_tokens=max_output_tokens,
+        )
         headers = {
             "Content-Type": "application/json",
             "x-goog-api-key": self.api_key,
         }
+        effective_max_output_tokens = self.max_output_tokens if max_output_tokens is None else max_output_tokens
         transient_retry_count = 0
 
         while True:
             try:
-                client_options: dict[str, Any] = {"timeout": self.timeout_seconds}
-                if self.transport is not None:
-                    client_options["transport"] = self.transport
-
-                async with httpx.AsyncClient(**client_options) as client:
-                    response = await client.post(self.endpoint, headers=headers, json=payload)
+                if self.client is not None:
+                    response = await self.client.post(
+                        self.endpoint,
+                        headers=headers,
+                        json=payload,
+                        timeout=self.timeout_seconds,
+                    )
                     response.raise_for_status()
+                else:
+                    client_options: dict[str, Any] = {"timeout": self.timeout_seconds}
+                    if self.transport is not None:
+                        client_options["transport"] = self.transport
+
+                    async with httpx.AsyncClient(**client_options) as client:
+                        response = await client.post(self.endpoint, headers=headers, json=payload)
+                        response.raise_for_status()
                 break
             except httpx.TimeoutException as exc:
                 raise LLMTimeoutError("Gemini request timed out") from exc
@@ -291,8 +319,8 @@ class GeminiProvider:
 
         if isinstance(candidate, dict) and candidate.get("finishReason") == "MAX_TOKENS":
             limit_hint = (
-                f"GEMINI_MAX_OUTPUT_TOKENS={self.max_output_tokens}"
-                if self.max_output_tokens is not None
+                f"GEMINI_MAX_OUTPUT_TOKENS={effective_max_output_tokens}"
+                if effective_max_output_tokens is not None
                 else "the configured Gemini output token limit"
             )
             raise LLMProviderError(

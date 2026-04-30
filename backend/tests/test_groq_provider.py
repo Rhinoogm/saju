@@ -102,6 +102,66 @@ async def test_groq_sends_configured_max_completion_tokens() -> None:
 
 
 @pytest.mark.asyncio
+async def test_groq_reuses_injected_async_client_without_closing_it() -> None:
+    requests: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.content))
+        return _chat_completion(model="reused-client-model")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = GroqProvider(
+            api_key="test-key",
+            base_url="http://groq.test/openai/v1",
+            model="openai/gpt-oss-20b",
+            client=client,
+        )
+
+        await provider.generate(
+            system="system",
+            prompt="prompt",
+            schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+            schema_name="TestOutput",
+        )
+        await provider.generate(
+            system="system",
+            prompt="prompt",
+            schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+            schema_name="TestOutput",
+        )
+
+        assert len(requests) == 2
+        assert client.is_closed is False
+
+
+@pytest.mark.asyncio
+async def test_groq_uses_per_call_max_output_token_override() -> None:
+    requests: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.content))
+        return _chat_completion()
+
+    provider = GroqProvider(
+        api_key="test-key",
+        base_url="http://groq.test/openai/v1",
+        model="openai/gpt-oss-20b",
+        max_completion_tokens=5000,
+        transport=httpx.MockTransport(handler),
+    )
+
+    await provider.generate(
+        system="system",
+        prompt="prompt",
+        schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+        schema_name="TestOutput",
+        max_output_tokens=1200,
+    )
+
+    assert requests[0]["max_completion_tokens"] == 1200
+
+
+@pytest.mark.asyncio
 async def test_groq_caps_completion_tokens_to_fit_request_budget() -> None:
     requests: list[dict] = []
 

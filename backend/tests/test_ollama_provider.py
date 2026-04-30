@@ -68,6 +68,35 @@ async def test_ollama_sends_num_predict_option() -> None:
 
 
 @pytest.mark.asyncio
+async def test_ollama_uses_per_call_max_output_token_override() -> None:
+    requests: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.content))
+        return _stream_response(
+            {"response": '{"ok":true}', "done": False},
+            {"response": "", "done": True, "done_reason": "stop", "model": "test-model"},
+        )
+
+    provider = OllamaProvider(
+        base_url="http://ollama.test",
+        model="test-model",
+        num_predict=4096,
+        transport=httpx.MockTransport(handler),
+    )
+
+    await provider.generate(
+        system="system",
+        prompt="prompt",
+        schema={"type": "object"},
+        schema_name="TestOutput",
+        max_output_tokens=1200,
+    )
+
+    assert requests[0]["options"]["num_predict"] == 1200
+
+
+@pytest.mark.asyncio
 async def test_ollama_raises_clear_error_when_generation_hits_length_limit() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return _stream_response(

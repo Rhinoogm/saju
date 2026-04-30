@@ -36,5 +36,6 @@ class LLMProvider(Protocol):
         prompt: str,
         schema: dict[str, Any],
         schema_name: str,
+        max_output_tokens: int | None = None,
     ) -> LLMResponse:
         ...

@@ -1,3 +1,7 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -11,7 +15,22 @@ from app.services.rate_limiter import InMemoryRateLimiter
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title=settings.app_name, version="0.1.0")
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        app.state.llm_http_client = httpx.AsyncClient()
+        app.state.llm_provider_cache = {}
+        try:
+            yield
+        finally:
+            client = getattr(app.state, "llm_http_client", None)
+            if isinstance(client, httpx.AsyncClient) and not client.is_closed:
+                await client.aclose()
+            app.state.llm_provider_cache.clear()
+
+    app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
+    app.state.llm_http_client = None
+    app.state.llm_provider_cache = {}
 
     app.state.prompt_store = None
     if settings.enable_admin_prompts:
