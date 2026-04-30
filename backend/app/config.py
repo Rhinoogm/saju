@@ -13,6 +13,25 @@ class Settings(BaseSettings):
     prompts_db_path: str = "./prompts.sqlite3"
     admin_api_key: str | None = None
     enable_admin_prompts: bool = False
+    local_demo_enabled: bool = False
+    local_demo_bearer_token: str = "local-demo-token"
+    local_demo_user_id: str = "00000000-0000-0000-0000-000000000001"
+    local_demo_email: str = "demo@local.test"
+
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
+    supabase_service_role_key: str = ""
+    supabase_jwt_audience: str = "authenticated"
+    database_url: str = ""
+
+    portone_api_secret: str = ""
+    portone_webhook_secret: str = ""
+    portone_store_id: str = ""
+    portone_channel_key: str = ""
+    portone_webhook_url: str = ""
+
+    saju_full_reading_amount_krw: int = Field(default=9900, ge=1)
+    saju_full_reading_order_name: str = "사주 심화 리딩 1회권"
 
     rate_limit_enabled: bool = True
     llm_rate_limit_per_ip_per_hour: int = 40

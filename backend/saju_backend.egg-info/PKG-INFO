@@ -8,6 +8,9 @@ Requires-Dist: uvicorn[standard]<1.0.0,>=0.30.0
 Requires-Dist: pydantic-settings<3.0.0,>=2.4.0
 Requires-Dist: httpx<1.0.0,>=0.27.0
 Requires-Dist: sajupy==0.2.0
+Requires-Dist: supabase<3.0.0,>=2.29.0
+Requires-Dist: asyncpg<1.0.0,>=0.31.0
+Requires-Dist: portone-server-sdk==0.20.0
 Provides-Extra: dev
 Requires-Dist: pytest<9.0.0,>=8.0.0; extra == "dev"
 Requires-Dist: pytest-asyncio<1.0.0,>=0.23.0; extra == "dev"

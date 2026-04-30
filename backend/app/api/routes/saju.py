@@ -6,7 +6,7 @@ import time
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from pydantic import ValidationError
 
 from app.config import Settings, get_settings
@@ -16,15 +16,10 @@ from app.schemas.saju import (
     FinalReadingResponse,
     GenerateCustomQuestionsRequest,
     GenerateCustomQuestionsResponse,
-    GenerateQuestionsRequest,
     GenerateQuestionsResponse,
-    DiagnosticQuestion,
     QuestionGenerationOutput,
     ResponseMeta,
-    SajuOnlyRequest,
-    SajuOnlyResponse,
 )
-from app.services.concern_questions import CONCERN_CATEGORY_LABELS, SUBJECTIVE_QUESTION_TEXT, classify_initial_concern, fixed_questions_for_category
 from app.services.calendar_service import CalendarCalculationError, CalendarService
 from app.services.llm.base import (
     LLMProvider,
@@ -39,10 +34,8 @@ from app.services.llm.groq_provider import GroqProvider
 from app.services.llm.ollama_provider import OllamaProvider
 from app.services.prompt_builder import build_custom_question_generation_prompt, build_final_reading_prompt
 from app.services.prompt_store import PromptStore
-from app.services.rate_limiter import enforce_llm_rate_limit
 from app.services.runtime_settings import resolve_runtime_llm_settings
 
-router = APIRouter(prefix="/api", tags=["saju"])
 logger = logging.getLogger(__name__)
 
 ProviderCacheKey = tuple[Any, ...]
@@ -391,7 +384,7 @@ def _parse_questions(content: str) -> QuestionGenerationOutput:
     except (json.JSONDecodeError, ValidationError) as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"LLM returned invalid question JSON: {content[:500]}",
+            detail="LLM returned invalid question JSON",
         ) from exc
 
 
@@ -423,146 +416,12 @@ def _parse_final_reading(content: str) -> FinalReadingOutput:
 def _invalid_final_reading_http_error(error: LLMInvalidOutputError) -> HTTPException:
     details = "; ".join(error.details[:8]) if error.details else error.reason
     logger.warning(
-        "Invalid final reading output from LLM. label=%s reason=%s details=%s partial_response=%r",
+        "Invalid final reading output from LLM. label=%s reason=%s details=%s",
         error.label,
         error.reason,
         details,
-        error.content[:1000],
     )
     return HTTPException(
         status_code=status.HTTP_502_BAD_GATEWAY,
-        detail=(
-            "LLM returned invalid final reading output. "
-            f"Reason: {details}. "
-            f"Partial response: {error.content[:500]}"
-        ),
+        detail=f"LLM returned invalid final reading output. Reason: {details}.",
     )
-
-
-
-@router.post(
-    "/generate-questions",
-    response_model=GenerateQuestionsResponse,
-)
-async def generate_questions(
-    payload: GenerateQuestionsRequest,
-    calendar_service: CalendarService = Depends(get_calendar_service),
-) -> GenerateQuestionsResponse:
-    try:
-        saju = calendar_service.calculate(payload)
-    except CalendarCalculationError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
-
-    category = classify_initial_concern(payload.initial_concern)
-    questions = fixed_questions_for_category(category)
-
-    return GenerateQuestionsResponse(
-        saju=saju,
-        category=category,
-        category_label=CONCERN_CATEGORY_LABELS[category],
-        questions=questions,
-        meta=ResponseMeta(
-            provider="system",
-            model="fixed-question-bank",
-            raw_metadata={"category": category.value},
-        ),
-    )
-
-
-@router.post(
-    "/generate-custom-questions",
-    response_model=GenerateCustomQuestionsResponse,
-    dependencies=[Depends(enforce_llm_rate_limit)],
-)
-async def generate_custom_questions(
-    payload: GenerateCustomQuestionsRequest,
-    request: Request,
-    response: Response,
-    settings: Settings = Depends(get_settings),
-    llm_provider: LLMProvider = Depends(get_llm_provider),
-    prompt_store: PromptStore | None = Depends(get_prompt_store),
-) -> GenerateCustomQuestionsResponse:
-    built_prompt = build_custom_question_generation_prompt(payload, prompt_store=prompt_store)
-    llm_response = await _call_llm(
-        llm_provider,
-        request=request,
-        http_response=response,
-        settings=settings,
-        system=built_prompt.system,
-        prompt=built_prompt.prompt,
-        schema=built_prompt.schema,
-        schema_name=built_prompt.schema_name,
-        max_output_tokens=settings.llm_custom_questions_max_output_tokens,
-    )
-    output = _parse_questions(llm_response.content)
-    questions = [
-        *output.questions,
-        DiagnosticQuestion(
-            id="q8",
-            type="short_text",
-            text=SUBJECTIVE_QUESTION_TEXT,
-            options=[],
-            intent_signal="추가 설명",
-        ),
-    ]
-
-    return GenerateCustomQuestionsResponse(
-        questions=questions,
-        meta=_meta(llm_response),
-    )
-
-
-@router.post(
-    "/final-reading",
-    response_model=FinalReadingResponse,
-    dependencies=[Depends(enforce_llm_rate_limit)],
-)
-async def final_reading(
-    payload: FinalReadingRequest,
-    request: Request,
-    response: Response,
-    calendar_service: CalendarService = Depends(get_calendar_service),
-    settings: Settings = Depends(get_settings),
-    llm_provider: LLMProvider = Depends(get_llm_provider),
-    prompt_store: PromptStore | None = Depends(get_prompt_store),
-) -> FinalReadingResponse:
-    try:
-        saju = calendar_service.calculate(payload)
-    except CalendarCalculationError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
-
-    built_prompt = build_final_reading_prompt(payload, saju, prompt_store=prompt_store)
-    llm_response = await _call_llm(
-        llm_provider,
-        request=request,
-        http_response=response,
-        settings=settings,
-        system=built_prompt.system,
-        prompt=built_prompt.prompt,
-        schema=built_prompt.schema,
-        schema_name=built_prompt.schema_name,
-        max_output_tokens=settings.llm_final_reading_max_output_tokens,
-    )
-    try:
-        output = _parse_final_reading(llm_response.content)
-    except LLMInvalidOutputError as exc:
-        raise _invalid_final_reading_http_error(exc) from exc
-
-    return FinalReadingResponse(
-        saju=saju,
-        reading=output,
-        meta=_meta(llm_response),
-    )
-
-
-@router.post("/saju-only", response_model=SajuOnlyResponse)
-async def saju_only(
-    payload: SajuOnlyRequest,
-    calendar_service: CalendarService = Depends(get_calendar_service),
-) -> SajuOnlyResponse:
-    try:
-        saju = calendar_service.calculate(payload)
-    except CalendarCalculationError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
-
-    return SajuOnlyResponse(saju=saju)

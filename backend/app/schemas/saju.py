@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from enum import Enum
+from uuid import UUID
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -301,3 +302,126 @@ class SajuOnlyRequest(BaseModel):
 
 class SajuOnlyResponse(BaseModel):
     saju: SajuData
+
+
+class ReadingSessionStatus(str, Enum):
+    payment_required = "payment_required"
+    paid = "paid"
+    fixed_questions_ready = "fixed_questions_ready"
+    custom_questions_ready = "custom_questions_ready"
+    final_ready = "final_ready"
+    failed = "failed"
+
+
+class ReadingSessionCreateRequest(InitialProfile):
+    reading_style: ReadingStyle = ReadingStyle.traditional
+
+
+class ReadingSessionResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    order_id: UUID | None = None
+    status: ReadingSessionStatus
+    reading_style: ReadingStyle
+    initial_profile: InitialProfile
+    saju: SajuData | None = None
+    category: ConcernCategory | None = None
+    category_label: str | None = None
+    fixed_questions: list[DiagnosticQuestion] | None = None
+    fixed_answers: list[QuestionAnswer] | None = None
+    custom_questions: list[DiagnosticQuestion] | None = None
+    custom_answers: list[QuestionAnswer] | None = None
+    final_result: FinalReadingResponse | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class FixedAnswersRequest(BaseModel):
+    fixed_answers: list[QuestionAnswer] = Field(..., min_length=3, max_length=4)
+
+    @model_validator(mode="after")
+    def validate_fixed_answer_ids(self) -> "FixedAnswersRequest":
+        actual_ids = [answer.question_id for answer in self.fixed_answers]
+        required_ids = ["q1", "q2", "q3"]
+        if actual_ids[:3] != required_ids:
+            raise ValueError("fixed_answers must start with q1, q2, q3 in order")
+        if len(actual_ids) == 4 and actual_ids[3] != "q4":
+            raise ValueError("the optional fixed answer must be q4")
+        if len(set(actual_ids)) != len(actual_ids):
+            raise ValueError("fixed_answers must not contain duplicate question ids")
+        return self
+
+
+class CustomAnswersRequest(BaseModel):
+    custom_answers: list[QuestionAnswer] = Field(..., min_length=3, max_length=4)
+
+    @model_validator(mode="after")
+    def validate_custom_answer_ids(self) -> "CustomAnswersRequest":
+        actual_ids = [answer.question_id for answer in self.custom_answers]
+        required_ids = ["q5", "q6", "q7"]
+        if actual_ids[:3] != required_ids:
+            raise ValueError("custom_answers must start with q5, q6, q7 in order")
+        if len(actual_ids) == 4 and actual_ids[3] != "q8":
+            raise ValueError("the optional custom answer must be q8")
+        if len(set(actual_ids)) != len(actual_ids):
+            raise ValueError("custom_answers must not contain duplicate question ids")
+        return self
+
+
+class CheckoutRequest(BaseModel):
+    session_id: UUID
+    product_code: str = Field(default="SAJU_FULL_READING", min_length=1, max_length=80)
+
+
+class CheckoutResponse(BaseModel):
+    order_id: UUID
+    payment_id: str
+    store_id: str
+    channel_key: str
+    order_name: str
+    total_amount: int
+    currency: str = "KRW"
+    notice_urls: list[str]
+
+
+class PaymentCompleteRequest(BaseModel):
+    payment_id: str = Field(..., min_length=1, max_length=120)
+    tx_id: str | None = Field(default=None, max_length=120)
+
+
+class PaymentCompleteResponse(BaseModel):
+    order_id: UUID
+    session_id: UUID | None = None
+    payment_id: str
+    status: str
+    credit_status: str | None = None
+
+
+class AccountMeResponse(BaseModel):
+    id: UUID
+    email: str | None = None
+    display_name: str | None = None
+    avatar_url: str | None = None
+    provider: str | None = None
+
+
+class AccountOrderResponse(BaseModel):
+    id: UUID
+    payment_id: str
+    product_code: str
+    order_name: str
+    amount_krw: int
+    currency: str
+    status: str
+    paid_at: str | None = None
+    created_at: str | None = None
+
+
+class AccountReadingResponse(BaseModel):
+    id: UUID
+    status: ReadingSessionStatus
+    reading_style: ReadingStyle
+    order_id: UUID | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    has_final_result: bool = False
