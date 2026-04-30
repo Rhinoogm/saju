@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     enable_admin_prompts: bool = False
 
     rate_limit_enabled: bool = True
-    llm_rate_limit_per_ip_per_hour: int = 6
-    llm_rate_limit_global_per_minute: int = 25
+    llm_rate_limit_per_ip_per_hour: int = 40
+    llm_rate_limit_global_per_minute: int = 200
     llm_custom_questions_max_output_tokens: int = Field(default=1200, ge=256, le=65536)
     llm_final_reading_max_output_tokens: int = Field(default=5000, ge=256, le=65536)
     llm_debug_metrics_enabled: bool = False
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     groq_max_request_tokens: int | None = Field(default=6000, ge=1024, le=1_000_000)
 
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.1-flash-lite-preview"
     gemini_api_key: str | None = None
     gemini_timeout_seconds: float = 60.0
     gemini_temperature: float = 0.25

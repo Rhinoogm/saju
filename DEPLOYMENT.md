@@ -1,12 +1,12 @@
-# Saju MVP 무료 배포 가이드
+# Saju MVP 배포 가이드
 
-이 프로젝트는 무료 공개 데모 기준으로 프론트엔드와 백엔드를 분리해서 배포한다.
+이 프로젝트는 프론트엔드와 백엔드를 분리해서 배포한다.
 
-- Frontend: Vercel Hobby, root directory `frontend/`
-- Backend: Render Free Web Service, root directory `backend/`
-- LLM: Groq Free API, `LLM_PROVIDER=groq`
+- Frontend: Vercel, root directory `frontend/`
+- Backend: Render Web Service, root directory `backend/`
+- LLM: Gemini 3.1 Flash-Lite 유료 결제, `LLM_PROVIDER=gemini`
 
-무료 플랜 제약을 전제로 한다. Render Free는 15분 유휴 후 수면 상태가 될 수 있고, Groq Free는 모델별 요청/토큰 한도가 있다. Vercel Hobby는 개인/비상업 용도 기준으로 사용한다.
+다수 사용자가 동시에 쓰는 공개 운영은 Render paid instance와 Gemini paid quota 기준으로 잡는다. 수면 상태가 있는 저가/테스트용 인스턴스는 첫 요청 지연이 생길 수 있으므로 운영 트래픽에는 사용하지 않는다.
 
 ## 1. 배포 전 확인
 
@@ -25,11 +25,11 @@ GitHub에 repo를 push한 뒤 Render와 Vercel에서 같은 repo를 연결한다
 
 ## 2. LLM API Key
 
-Gemini AI Studio에서 API key를 만든다. 추천 모델은 `gemini-2.5-flash`다. 현재 백엔드의 Gemini provider는 Google AI Studio Gemini API의 JSON Schema structured output을 사용한다.
+Gemini AI Studio에서 API key를 만든다. 운영 추천 모델은 `gemini-3.1-flash-lite-preview`다. 현재 백엔드의 Gemini provider는 Google AI Studio Gemini API의 JSON Schema structured output을 사용한다.
 
 Groq를 계속 사용할 수도 있다. Groq 추천 모델은 `openai/gpt-oss-20b`이며, Groq provider는 이 모델에서 JSON Schema response format을 사용한다.
 
-LLM 무료 한도는 계정과 조직 기준으로 적용된다. 최신 한도는 각 provider 콘솔의 rate limit 문서를 확인한다.
+Gemini active limit은 project와 모델 기준으로 적용된다. 이 문서는 AI Studio에서 `4,000 RPM`, `4,000,000 TPM`, `150,000 RPD`가 표시되는 Gemini 3.1 Flash-Lite 유료 설정을 기준으로 한다. 최신 한도는 각 provider 콘솔의 rate limit 문서를 확인한다.
 
 ## 3. Render Backend
 
@@ -40,7 +40,7 @@ Render Dashboard에서 `New > Web Service`를 선택하고 GitHub repo를 연결
 - Name: `saju-backend`
 - Root Directory: `backend`
 - Runtime: `Python 3`
-- Instance Type: `Free`
+- Instance Type: paid instance
 - Build Command: `python -m pip install -e .`
 - Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
@@ -49,7 +49,7 @@ Render Dashboard에서 `New > Web Service`를 선택하고 GitHub repo를 연결
 ```env
 LLM_PROVIDER=gemini
 GEMINI_API_KEY=<your-gemini-api-key>
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.1-flash-lite-preview
 GEMINI_RESPONSE_SCHEMA_MODE=json_schema
 GEMINI_MAX_OUTPUT_TOKENS=5000
 GEMINI_TIMEOUT_SECONDS=60
@@ -69,9 +69,11 @@ CORS_ORIGINS=https://saju-frontend.vercel.app
 CORS_ORIGIN_REGEX=
 
 RATE_LIMIT_ENABLED=true
-LLM_RATE_LIMIT_PER_IP_PER_HOUR=6
-LLM_RATE_LIMIT_GLOBAL_PER_MINUTE=25
+LLM_RATE_LIMIT_PER_IP_PER_HOUR=40
+LLM_RATE_LIMIT_GLOBAL_PER_MINUTE=200
 ```
+
+Gemini 3.1 Flash-Lite 유료 active limit이 약 `4,000 RPM`, `4,000,000 TPM`, `150,000 RPD`라면 `LLM_RATE_LIMIT_GLOBAL_PER_MINUTE=200`부터 시작한다. 전체 리딩 1회가 LLM 2회를 사용하므로 분당 약 100명 완료 수준이다. 로그와 Gemini dashboard가 안정적이면 `300`, 이후 `400-500` 순서로 올린다.
 
 첫 배포가 끝나면 Render URL을 확인한다.
 
@@ -134,21 +136,23 @@ CORS_ORIGINS=https://saju-frontend.vercel.app,https://yourdomain.com
 - 오른쪽 위 설정 버튼에서 관리자 비밀번호를 입력하면 `/admin/prompts`로 이동한다.
 - `/admin/prompts`는 백엔드 `ENABLE_ADMIN_PROMPTS=true`와 `ADMIN_API_KEY`가 설정되어 있어야 불러오기/저장이 가능하다.
 - Gemini, Groq, 자체 제한 한도 초과 시 429 안내 메시지가 표시된다.
-- Render가 잠든 뒤 첫 요청에서 지연이 있어도 프론트 로딩 상태가 유지된다.
+- backend cold start, scale-up, provider 지연 상황에서도 프론트 로딩 상태가 유지된다.
+
+다수 사용자가 동시에 접근하는 실제 운영 공개 전에는 [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md)의 용량, 보안, rate limit, 모니터링 항목까지 확인한다.
 
 ## 7. 장애 대응
 
-- `429 Too Many Requests`: 자체 rate limit 또는 LLM provider 무료 한도 초과다. 잠시 뒤 재시도한다.
-- `413 Request Entity Too Large`: Groq의 tokens-per-minute 한도보다 요청이 크다. Free tier에서 `Limit 6000`이 보이면 Render 환경변수 `GROQ_MAX_REQUEST_TOKENS=6000`으로 낮춘 뒤 redeploy한다.
+- `429 Too Many Requests`: 자체 rate limit 또는 LLM provider quota 초과다. 잠시 뒤 재시도하거나 앱 한도와 Gemini quota를 확인한다.
+- `413 Request Entity Too Large`: provider의 tokens-per-minute 한도보다 요청이 크다. prompt 길이, output token, provider TPM 한도를 확인한다.
 - `502 Bad Gateway`: LLM 응답 실패 또는 JSON schema 검증 실패다. Render logs에서 provider error body를 확인한다.
 - `504 Gateway Timeout`: LLM 응답 시간이 초과됐다. 필요하면 `GEMINI_TIMEOUT_SECONDS=90` 또는 `GROQ_TIMEOUT_SECONDS=90`으로 올린다.
-- 첫 요청이 느림: Render Free 콜드 스타트로 볼 수 있다.
+- 첫 요청이 느림: backend cold start, scale-up, provider 지연을 확인한다.
 - 관리자 프롬프트 수정 불가: Render의 `ENABLE_ADMIN_PROMPTS=true`, `ADMIN_API_KEY`, `CORS_ORIGINS` 설정을 확인한다.
 
-## 8. 유료 전환 기준
+## 8. 확장 기준
 
-사용자가 꾸준히 들어오면 다음 순서로 유료 전환을 검토한다.
+사용자가 꾸준히 들어오면 다음 순서로 확장을 검토한다.
 
-1. Render backend를 paid instance로 전환해 콜드 스타트를 제거한다.
-2. Gemini 또는 Groq의 유료 plan으로 rate limit을 늘린다.
-3. 관리자 프롬프트 편집을 다시 켤 경우 SQLite 대신 Neon 또는 Supabase Postgres로 이전한다.
+1. Render backend instance size를 올리거나 worker/instance 확장 방식을 정한다.
+2. Gemini quota 사용률을 보고 `LLM_RATE_LIMIT_GLOBAL_PER_MINUTE`를 `300`, `400-500` 순서로 올린다.
+3. 관리자 프롬프트 편집을 운영에서 계속 사용할 경우 SQLite 대신 Neon 또는 Supabase Postgres로 이전한다.

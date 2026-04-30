@@ -32,7 +32,7 @@ class GeminiProvider:
         *,
         api_key: str | None,
         base_url: str = "https://generativelanguage.googleapis.com/v1beta",
-        model: str = "gemini-2.5-flash",
+        model: str = "gemini-3.1-flash-lite-preview",
         timeout_seconds: float = 60.0,
         temperature: float = 0.25,
         response_schema_mode: Literal["json_schema", "json", "none"] = "json_schema",

@@ -11,11 +11,13 @@ def test_llm_completion_token_defaults_are_large_enough_for_final_reading() -> N
     settings = Settings(_env_file=None)
 
     assert settings.llm_provider == "gemini"
-    assert settings.gemini_model == "gemini-2.5-flash"
+    assert settings.gemini_model == "gemini-3.1-flash-lite-preview"
     assert settings.ollama_num_predict == 4096
     assert settings.groq_max_completion_tokens == 5000
     assert settings.groq_max_request_tokens == 6000
     assert settings.gemini_max_output_tokens == 5000
+    assert settings.llm_rate_limit_per_ip_per_hour == 40
+    assert settings.llm_rate_limit_global_per_minute == 200
     assert settings.llm_custom_questions_max_output_tokens == 1200
     assert settings.llm_final_reading_max_output_tokens == 5000
     assert settings.llm_debug_metrics_enabled is False

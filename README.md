@@ -57,7 +57,7 @@ Gemini AI Studio API 사용:
 ```bash
 LLM_PROVIDER=gemini
 GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.1-flash-lite-preview
 GEMINI_RESPONSE_SCHEMA_MODE=json_schema
 GEMINI_MAX_OUTPUT_TOKENS=5000
 LLM_CUSTOM_QUESTIONS_MAX_OUTPUT_TOKENS=1200
@@ -151,6 +151,8 @@ cd backend
 pytest
 ```
 
-## 무료 배포
+## 배포
 
-무료 공개 데모 배포는 Vercel 프론트엔드, Render FastAPI 백엔드, Groq Free API 구성을 권장합니다. 상세 절차와 환경변수는 [DEPLOYMENT.md](DEPLOYMENT.md)를 참고하세요.
+운영 배포는 Vercel 프론트엔드, Render FastAPI 백엔드, Gemini 유료 API 구성을 기준으로 합니다. 상세 절차와 환경변수는 [DEPLOYMENT.md](DEPLOYMENT.md)를 참고하세요.
+
+다수 동시 사용자와 실제 운영 장애 대응까지 점검하려면 [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md)를 함께 확인하세요.
