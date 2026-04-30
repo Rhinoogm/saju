@@ -50,7 +50,7 @@ const readingStyleOptions: {
   },
   {
     style: "direct",
-    nickname: "틀린 말은 아니라서 더 열받는 개발자 출신 명리학자",
+    nickname: "틀린 말은 안 해서 더 열받는 개발자 출신 명리학자",
     description: "위로보다 리스크와 행동 기준을 직설적으로 짚는 현실 분석형 풀이입니다.",
     icon: ClipboardCheck,
     accentClass: "bg-mint text-white",
