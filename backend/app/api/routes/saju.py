@@ -14,17 +14,16 @@ from app.schemas.saju import (
     FinalReadingOutput,
     FinalReadingRequest,
     FinalReadingResponse,
-    GenerateCustomQuestionsRequest,
-    GenerateCustomQuestionsResponse,
+    GenerateNextQuestionRequest,
+    GenerateNextQuestionResponse,
     GenerateQuestionsRequest,
     GenerateQuestionsResponse,
-    DiagnosticQuestion,
     QuestionGenerationOutput,
     ResponseMeta,
     SajuOnlyRequest,
     SajuOnlyResponse,
 )
-from app.services.concern_questions import CONCERN_CATEGORY_LABELS, SUBJECTIVE_QUESTION_TEXT, classify_initial_concern, fixed_questions_for_category
+from app.services.concern_questions import next_counseling_question_id
 from app.services.calendar_service import CalendarCalculationError, CalendarService
 from app.services.llm.base import (
     LLMProvider,
@@ -37,7 +36,7 @@ from app.services.llm.base import (
 from app.services.llm.gemini_provider import GeminiProvider
 from app.services.llm.groq_provider import GroqProvider
 from app.services.llm.ollama_provider import OllamaProvider
-from app.services.prompt_builder import build_custom_question_generation_prompt, build_final_reading_prompt
+from app.services.prompt_builder import build_final_reading_prompt, build_question_generation_prompt
 from app.services.prompt_store import PromptStore
 from app.services.rate_limiter import enforce_llm_rate_limit
 from app.services.runtime_settings import resolve_runtime_llm_settings
@@ -385,10 +384,10 @@ async def _call_llm(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
-def _parse_questions(content: str) -> QuestionGenerationOutput:
+def _parse_question(content: str, *, expected_id: str) -> QuestionGenerationOutput:
     try:
-        return QuestionGenerationOutput.model_validate(json.loads(content))
-    except (json.JSONDecodeError, ValidationError) as exc:
+        return QuestionGenerationOutput.model_validate(json.loads(content)).require_question_id(expected_id)
+    except (json.JSONDecodeError, ValidationError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"LLM returned invalid question JSON: {content[:500]}",
@@ -443,46 +442,24 @@ def _invalid_final_reading_http_error(error: LLMInvalidOutputError) -> HTTPExcep
 @router.post(
     "/generate-questions",
     response_model=GenerateQuestionsResponse,
+    dependencies=[Depends(enforce_llm_rate_limit)],
 )
 async def generate_questions(
     payload: GenerateQuestionsRequest,
+    request: Request,
+    response: Response,
     calendar_service: CalendarService = Depends(get_calendar_service),
+    settings: Settings = Depends(get_settings),
+    llm_provider: LLMProvider = Depends(get_llm_provider),
+    prompt_store: PromptStore | None = Depends(get_prompt_store),
 ) -> GenerateQuestionsResponse:
     try:
         saju = calendar_service.calculate(payload)
     except CalendarCalculationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
-    category = classify_initial_concern(payload.initial_concern)
-    questions = fixed_questions_for_category(category)
-
-    return GenerateQuestionsResponse(
-        saju=saju,
-        category=category,
-        category_label=CONCERN_CATEGORY_LABELS[category],
-        questions=questions,
-        meta=ResponseMeta(
-            provider="system",
-            model="fixed-question-bank",
-            raw_metadata={"category": category.value},
-        ),
-    )
-
-
-@router.post(
-    "/generate-custom-questions",
-    response_model=GenerateCustomQuestionsResponse,
-    dependencies=[Depends(enforce_llm_rate_limit)],
-)
-async def generate_custom_questions(
-    payload: GenerateCustomQuestionsRequest,
-    request: Request,
-    response: Response,
-    settings: Settings = Depends(get_settings),
-    llm_provider: LLMProvider = Depends(get_llm_provider),
-    prompt_store: PromptStore | None = Depends(get_prompt_store),
-) -> GenerateCustomQuestionsResponse:
-    built_prompt = build_custom_question_generation_prompt(payload, prompt_store=prompt_store)
+    target_question_id = next_counseling_question_id(0)
+    built_prompt = build_question_generation_prompt(payload, target_question_id=target_question_id, prompt_store=prompt_store)
     llm_response = await _call_llm(
         llm_provider,
         request=request,
@@ -494,20 +471,45 @@ async def generate_custom_questions(
         schema_name=built_prompt.schema_name,
         max_output_tokens=settings.llm_custom_questions_max_output_tokens,
     )
-    output = _parse_questions(llm_response.content)
-    questions = [
-        *output.questions,
-        DiagnosticQuestion(
-            id="q8",
-            type="short_text",
-            text=SUBJECTIVE_QUESTION_TEXT,
-            options=[],
-            intent_signal="추가 설명",
-        ),
-    ]
+    output = _parse_question(llm_response.content, expected_id=target_question_id)
 
-    return GenerateCustomQuestionsResponse(
-        questions=questions,
+    return GenerateQuestionsResponse(
+        saju=saju,
+        question=output.question,
+        meta=_meta(llm_response),
+    )
+
+
+@router.post(
+    "/generate-next-question",
+    response_model=GenerateNextQuestionResponse,
+    dependencies=[Depends(enforce_llm_rate_limit)],
+)
+async def generate_next_question(
+    payload: GenerateNextQuestionRequest,
+    request: Request,
+    response: Response,
+    settings: Settings = Depends(get_settings),
+    llm_provider: LLMProvider = Depends(get_llm_provider),
+    prompt_store: PromptStore | None = Depends(get_prompt_store),
+) -> GenerateNextQuestionResponse:
+    target_question_id = next_counseling_question_id(len(payload.answers))
+    built_prompt = build_question_generation_prompt(payload, target_question_id=target_question_id, prompt_store=prompt_store)
+    llm_response = await _call_llm(
+        llm_provider,
+        request=request,
+        http_response=response,
+        settings=settings,
+        system=built_prompt.system,
+        prompt=built_prompt.prompt,
+        schema=built_prompt.schema,
+        schema_name=built_prompt.schema_name,
+        max_output_tokens=settings.llm_custom_questions_max_output_tokens,
+    )
+    output = _parse_question(llm_response.content, expected_id=target_question_id)
+
+    return GenerateNextQuestionResponse(
+        question=output.question,
         meta=_meta(llm_response),
     )
 

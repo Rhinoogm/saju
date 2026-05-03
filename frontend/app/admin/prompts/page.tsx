@@ -5,8 +5,8 @@ import Link from "next/link";
 import { ArrowLeft, RefreshCcw, Save, Settings2 } from "lucide-react";
 
 type PromptName =
-  | "question_system_prompt"
-  | "question_user_prompt"
+  | "counseling_question_system_prompt"
+  | "counseling_question_user_prompt"
   | "final_system_prompt_traditional"
   | "final_system_prompt_empathetic"
   | "final_system_prompt_direct"
@@ -31,8 +31,8 @@ interface LLMSettingsResponse {
 const STORAGE_KEY = "saju_admin_api_key";
 
 const emptyContent: Record<PromptName, string> = {
-  question_system_prompt: "",
-  question_user_prompt: "",
+  counseling_question_system_prompt: "",
+  counseling_question_user_prompt: "",
   final_system_prompt_traditional: "",
   final_system_prompt_empathetic: "",
   final_system_prompt_direct: "",
@@ -40,8 +40,8 @@ const emptyContent: Record<PromptName, string> = {
 };
 
 const emptyPromptUpdatedAt: Record<PromptName, string | null> = {
-  question_system_prompt: null,
-  question_user_prompt: null,
+  counseling_question_system_prompt: null,
+  counseling_question_user_prompt: null,
   final_system_prompt_traditional: null,
   final_system_prompt_empathetic: null,
   final_system_prompt_direct: null,
@@ -128,8 +128,8 @@ async function saveLLMSettings(settings: LLMSettingsResponse, adminKey: string):
 export default function AdminPromptsPage() {
   const promptNames: { name: PromptName; label: string; description: string }[] = useMemo(
     () => [
-      { name: "question_system_prompt", label: "맞춤 질문 System", description: "맞춤 질문 생성 역할과 JSON 출력 규칙" },
-      { name: "question_user_prompt", label: "맞춤 질문 Prompt", description: "{profile_json}, {category_json}, {fixed_answers_json} 사용 가능" },
+      { name: "counseling_question_system_prompt", label: "상담 질문 System", description: "5단계 상담 질문 생성 역할과 JSON 출력 규칙" },
+      { name: "counseling_question_user_prompt", label: "상담 질문 Prompt", description: "{profile_json}, {step_guide_json}, {previous_answers_json} 사용 가능" },
       { name: "final_system_prompt_traditional", label: "정통 사주 System", description: "근본있는 철학관 최종 리포트 역할과 JSON 출력 규칙" },
       { name: "final_system_prompt_empathetic", label: "공감형 System", description: "과몰입 극F 호소인 최종 리포트 역할과 JSON 출력 규칙" },
       { name: "final_system_prompt_direct", label: "직설 분석 System", description: "감정 뺀 결과보고서 최종 리포트 역할과 JSON 출력 규칙" },

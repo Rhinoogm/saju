@@ -1,331 +1,125 @@
 from __future__ import annotations
 
-from app.schemas.saju import ConcernCategory, DiagnosticQuestion, QuestionOption
+from dataclasses import dataclass
 
 
-CONCERN_CATEGORY_LABELS: dict[ConcernCategory, str] = {
-    ConcernCategory.romance: "연애",
-    ConcernCategory.career: "직업",
-    ConcernCategory.finance: "금전",
-    ConcernCategory.health: "건강",
-    ConcernCategory.academics: "학업/진로",
-    ConcernCategory.others: "그 외",
-}
+COUNSELING_QUESTION_IDS = ("q1", "q2", "q3", "q4", "q5")
 
 
-_CATEGORY_KEYWORDS: dict[ConcernCategory, tuple[str, ...]] = {
-    ConcernCategory.romance: (
-        "연애",
-        "남친",
-        "여친",
-        "애인",
-        "썸",
-        "짝사랑",
-        "이별",
-        "재회",
-        "결혼",
-        "배우자",
-        "데이트",
-        "사랑",
-        "애정",
+@dataclass(frozen=True)
+class CounselingStepGuide:
+    id: str
+    step: int
+    title: str
+    framework: str
+    objective: str
+    base_question: str
+    base_options: tuple[str, str, str, str]
+    intent_signal: str
+
+    def as_prompt_payload(self) -> dict[str, object]:
+        return {
+            "id": self.id,
+            "step": self.step,
+            "title": self.title,
+            "framework": self.framework,
+            "objective": self.objective,
+            "base_question": self.base_question,
+            "base_options": list(self.base_options),
+            "intent_signal": self.intent_signal,
+        }
+
+
+COUNSELING_STEP_GUIDES: tuple[CounselingStepGuide, ...] = (
+    CounselingStepGuide(
+        id="q1",
+        step=1,
+        title="감정의 명료화",
+        framework="CBT 자동적 사고 탐색을 위한 현재 감정 확인",
+        objective="내담자가 고민을 떠올릴 때 가장 크게 지배받는 핵심 감정을 파악한다.",
+        base_question="지금 이 고민을 떠올리실 때, 마음속에서 가장 크게 느껴지는 감정은 무엇인가요?",
+        base_options=(
+            "무언가 잘못될 것 같은 불안과 초조함",
+            "내 힘으로는 어찌할 수 없을 것 같은 막막함과 무기력",
+            "반드시 이루어졌으면 하는 간절함과 기대",
+            "나 혼자서 감당해야 한다는 외로움과 부담감",
+        ),
+        intent_signal="감정 명료화",
     ),
-    ConcernCategory.career: (
-        "회사",
-        "직장",
-        "직업",
-        "이직",
-        "퇴사",
-        "업무",
-        "상사",
-        "동료",
-        "연봉",
-        "월급",
-        "면접",
-        "취업",
-        "구직",
-        "커리어",
-        "일자리",
+    CounselingStepGuide(
+        id="q2",
+        step=2,
+        title="통제 소재 파악",
+        framework="Julian Rotter의 통제 소재 이론",
+        objective="내담자가 문제의 해결 주체를 자신, 타인, 환경 중 어디에 두고 있는지 확인한다.",
+        base_question="이 고민이 최종적으로 어떤 결과로 이어질지 결정하는 가장 큰 요인은 무엇이라고 생각하시나요?",
+        base_options=(
+            "나의 구체적인 선택과 앞으로의 노력",
+            "나를 둘러싼 주변 사람들의 도움이나 반응",
+            "내가 통제할 수 없는 운명이나 시기적인 타이밍",
+            "아직은 무엇이 결과를 바꿀지 잘 모르겠음",
+        ),
+        intent_signal="통제 소재",
     ),
-    ConcernCategory.finance: (
-        "돈",
-        "금전",
-        "생활비",
-        "월세",
-        "대출",
-        "빚",
-        "부채",
-        "재테크",
-        "투자",
-        "주식",
-        "코인",
-        "부업",
-        "투잡",
-        "저축",
-        "적금",
+    CounselingStepGuide(
+        id="q3",
+        step=3,
+        title="핵심 신념 및 결핍 확인",
+        framework="Maslow 욕구 위계와 CBT Schema",
+        objective="고민을 통해 채우고자 하는 안정, 인정, 애정, 자율성의 심리적 욕구를 확인한다.",
+        base_question="만약 누군가 이 고민에 대해 딱 한 마디를 해준다면, 어떤 말이 가장 위로가 될까요?",
+        base_options=(
+            "큰 문제 없이 지금처럼 무탈할 거예요.",
+            "당신은 충분히 그럴 자격과 능력이 있어요.",
+            "당신의 마음을 이해해요. 제가 곁에 있을게요.",
+            "당신의 생각과 선택이 맞아요. 그대로 밀고 나가세요.",
+        ),
+        intent_signal="핵심 욕구",
     ),
-    ConcernCategory.health: (
-        "건강",
-        "아파",
-        "아픈",
-        "통증",
-        "병원",
-        "피곤",
-        "불면",
-        "잠",
-        "수면",
-        "우울",
-        "불안",
-        "무기력",
-        "스트레스",
-        "체력",
-        "마음",
-        "몸",
+    CounselingStepGuide(
+        id="q4",
+        step=4,
+        title="변화 준비도 및 행동 동기",
+        framework="Motivational Interviewing",
+        objective="내담자가 현재 행동할 준비가 되어 있는지, 정서적 지지를 원하는 상태인지 판별한다.",
+        base_question="현재 이 고민을 해결하기 위해 본인에게 가장 필요한 것은 무엇이라고 생각하시나요?",
+        base_options=(
+            "상황을 바꿀 수 있는 현실적이고 구체적인 방법과 계획",
+            "내가 생각한 방향이 틀리지 않았다는 확인과 지지",
+            "결국엔 다 잘 풀릴 것이라는 무조건적인 희망과 긍정",
+            "복잡한 내 마음을 스스로 정리할 수 있는 객관적인 시각",
+        ),
+        intent_signal="변화 준비도",
     ),
-    ConcernCategory.academics: (
-        "학업",
-        "공부",
-        "시험",
-        "성적",
-        "진로",
-        "학교",
-        "대학",
-        "수능",
-        "과제",
-        "논문",
-        "자격증",
-        "합격",
-        "입시",
-        "전공",
+    CounselingStepGuide(
+        id="q5",
+        step=5,
+        title="해결중심 투사",
+        framework="SFBT 기적 질문 변형",
+        objective="내담자가 무의식적으로 바라는 결말과 해결의 형태를 확인한다.",
+        base_question="만약 내일 아침 이 고민이 기적처럼 흔적도 없이 사라진다면, 그 이유는 무엇일까요?",
+        base_options=(
+            "내가 스스로 용기를 내어 행동하고 상황을 부딪혀 바꿨기 때문에",
+            "나를 힘들게 하거나 신경 쓰이게 하던 사람이나 외부 요인이 변했기 때문에",
+            "시간이 흐르면서 걱정했던 것과 달리 자연스럽게 상황이 풀렸기 때문에",
+            "예상치 못한 새로운 기회나 도와줄 사람이 나타났기 때문에",
+        ),
+        intent_signal="희망 해결상",
     ),
-    ConcernCategory.others: (
-        "가족",
-        "친구",
-        "인간관계",
-        "정체성",
-        "외로움",
-        "허무",
-        "위기",
-        "일상",
-        "삶",
-        "인생",
-    ),
-}
+)
 
 
-_FIXED_QUESTION_BANK: dict[ConcernCategory, list[tuple[str, list[str]]]] = {
-    ConcernCategory.romance: [
-        (
-            "요즘 연애나 인간관계에서 가장 마음이 향하는 곳이나, 바라는 긍정적인 변화는 무엇인가요?",
-            [
-                "서로의 속마음을 더 편안하고 깊게 나누는 대화가 늘어났으면 좋겠어요",
-                "성향이나 가치관의 차이를 지혜롭게 잘 맞춰갈 방법을 찾고 싶어요",
-                "지금보다 조금 더 다정하고 따뜻한 표현과 관심이 오갔으면 좋겠어요",
-                "앞으로 우리 관계가 어떤 방향으로 나아갈지 예쁘게 그림을 그려보고 싶어요",
-            ],
-        ),
-        (
-            "원하시는 변화를 위해 최근에 어떤 시도를 해보시거나 생각해보셨나요?",
-            [
-                "내 진심을 담담하게 전해볼 기회를 찾고 있어요",
-                "혼자만의 시간을 가지며 내 마음이 어떤지 차분히 들여다보고 있어요",
-                "상대방의 입장에서 한 번 더 생각하고 배려해보려고 노력해요",
-                "주변의 건강한 관계를 보며 조언이나 힌트를 얻고 있어요",
-            ],
-        ),
-        (
-            "이 관계가 바라던 모습으로 편안해진다면, 내 마음속에 어떤 감정이 가장 크게 자리 잡을까요?",
-            [
-                "온전히 이해받고 있다는 든든함과 안도감",
-                "함께 미래를 꿈꿀 수 있다는 설렘과 기대감",
-                "내 있는 그대로의 모습을 사랑받는다는 충만함",
-                "흔들림 없이 서로를 믿을 수 있다는 깊은 신뢰감",
-            ],
-        ),
-    ],
-    ConcernCategory.career: [
-        (
-            "요즘 커리어나 직장 생활에서 가장 집중하고 있거나, 새롭게 원하는 방향은 어떤 것인가요?",
-            [
-                "일과 내 개인적인 삶의 균형(워라밸)을 예쁘게 맞추고 싶어요",
-                "사람들과 더 원활하게 소통하고 즐거운 분위기에서 일하고 싶어요",
-                "내 노력과 성과에 맞는 정당한 인정과 보상을 받고 싶어요",
-                "지금보다 더 성장할 수 있고 가슴 뛰는 새로운 일을 찾아보고 싶어요",
-            ],
-        ),
-        (
-            "이 목표를 향해 나아가기 위해 요즘 일상에서 어떤 준비를 하고 계신가요?",
-            [
-                "새로운 도전을 위해 이력서를 다듬거나 채용 공고를 눈여겨보고 있어요",
-                "나의 전문성을 높이려고 관련 공부를 하거나 자격증을 준비해요",
-                "현재 직장에서 부서 이동이나 업무 조율 등 더 나은 환경을 만들고 있어요",
-                "당장 서두르기보다 지금 자리에서 내실을 다지며 때를 기다리고 있어요",
-            ],
-        ),
-        (
-            "커리어에서 원하는 바를 이루었을 때, 일상에서 가장 크게 달라지길 기대하는 부분은 무엇인가요?",
-            [
-                "경제적인 여유에서 오는 삶의 안정감과 자신감",
-                "새로운 환경과 사람들에게서 얻는 신선한 자극과 활력",
-                "내 능력을 온전히 발휘하고 있다는 깊은 성취감",
-                "나를 믿고 응원해 주는 사람들과 나누는 성장의 기쁨",
-            ],
-        ),
-    ],
-    ConcernCategory.finance: [
-        (
-            "요즘 재무 관리나 돈과 관련해서 가장 집중적으로 살펴보고 있는 부분은 무엇인가요?",
-            [
-                "매달 나가는 돈을 점검하고 여유 자금을 조금씩 늘려가고 싶어요",
-                "가지고 있는 빚이나 대출을 건강하고 계획적으로 줄여가고 싶어요",
-                "종잣돈을 모으거나 재테크를 통해 내 자산을 더 불려보고 싶어요",
-                "미래에 찾아올 수 있는 큰 지출을 대비해 튼튼한 안전망을 만들고 싶어요",
-            ],
-        ),
-        (
-            "안정적인 경제 상황을 만들기 위해 최근에 작게라도 실천하고 있는 긍정적인 행동이 있을까요?",
-            [
-                "가계부를 쓰거나 지출 내역을 확인하며 불필요한 낭비를 줄이고 있어요",
-                "나의 재능이나 자투리 시간을 활용해 추가적인 수입을 만들어보고 있어요",
-                "경제 기사, 책, 영상 등을 보며 돈에 대한 공부를 꾸준히 하고 있어요",
-                "전문가나 금융기관의 도움을 받아 내 재무 상태를 재정비하고 있어요",
-            ],
-        ),
-        (
-            "재정적으로 마음이 놓이는 상태가 된다면, 그 여유를 통해 가장 누리고 싶은 일상은 무엇인가요?",
-            [
-                "메뉴판의 가격보다 내가 먹고 싶은 것을 기분 좋게 고르는 소소한 행복",
-                "소중한 사람들에게 마음을 담은 선물을 부담 없이 건네는 기쁨",
-                "돈 걱정 없이 내가 진짜 해보고 싶었던 경험(여행, 취미 등)에 투자하는 것",
-                "당장 일을 쉬어도 당분간은 괜찮다는 든든한 자유와 평온함",
-            ],
-        ),
-    ],
-    ConcernCategory.health: [
-        (
-            "최근 몸과 마음의 건강을 돌보면서, 가장 개선하고 싶거나 좋아졌으면 하는 부분은 어디인가요?",
-            [
-                "아침에 눈을 떴을 때 몸이 개운하고 가벼운 활력을 느끼고 싶어요",
-                "평소 불편했던 곳이 편안해지고 통증 없는 가벼운 일상을 원해요",
-                "일상에서 받는 스트레스를 잘 흘려보내고 평온함을 유지하고 싶어요",
-                "감정의 기복 없이 마음의 중심을 단단하게 잡고 싶어요",
-            ],
-        ),
-        (
-            "더 건강해지기 위한 첫걸음으로 요즘 내 삶에 어떤 작은 변화를 주고 계신가요?",
-            [
-                "제때 밥을 먹고 일찍 잠자리에 드는 등 규칙적인 패턴을 만들고 있어요",
-                "나만의 취미나 휴식 시간을 가지면서 스트레스를 기분 좋게 환기해요",
-                "짧게라도 산책이나 스트레칭을 하며 내 몸을 직접 움직여보고 있어요",
-                "내 상태를 정확히 알기 위해 전문가를 찾거나 건강 정보를 알아보고 있어요",
-            ],
-        ),
-        (
-            "몸과 마음이 원하시는 만큼 건강해진다면, 나에게 어떤 선물을 가장 먼저 주고 싶으신가요?",
-            [
-                "체력 걱정 없이 미뤄두었던 활동이나 여행을 훌쩍 떠나보는 것",
-                "돈과 시간을 나를 가꾸고 돌보는 일에 온전히 기분 좋게 쓰는 것",
-                "작은 일에도 쉽게 지치지 않고 꾸준히 무언가를 이어갈 수 있는 에너지",
-                "거울 속에 비친 맑고 편안한 내 얼굴을 보며 미소 짓는 것",
-            ],
-        ),
-    ],
-    ConcernCategory.academics: [
-        (
-            "요즘 공부나 진로를 탐색하는 과정에서, 가장 바라는 '나의 모습'은 어떤 것인가요?",
-            [
-                "내가 왜 이 공부를 하는지 명확한 이유를 찾고, 가슴 뛰는 목표를 세우고 싶어요",
-                "내가 투자한 시간과 노력만큼 정직하고 뿌듯한 성과를 맛보고 싶어요",
-                "억지로가 아니라 내 진짜 적성과 흥미에 꼭 맞는 길을 발견하고 싶어요",
-                "막막해 보이는 공부량 앞에서도 겁먹지 않고 하나씩 해내는 여유를 가지고 싶어요",
-            ],
-        ),
-        (
-            "이 배움의 길을 더 잘 걷기 위해, 요즘 어떤 나만의 전략을 세워보고 계신가요?",
-            [
-                "스마트폰을 멀리하거나 장소를 바꾸면서 나만의 집중 환경을 만들고 있어요",
-                "완벽해야 한다는 부담을 내려놓고, 일단 10분이라도 시작하는 연습을 해요",
-                "거창한 계획보다는 오늘 하루 실천할 수 있는 작은 계획표를 세워보고 있어요",
-                "혼자 끙끙대기보다 선생님이나 멘토, 잘 맞는 친구에게 질문하고 배우고 있어요",
-            ],
-        ),
-        (
-            "학업이나 진로에서 목표했던 바를 딱 이루는 순간, 가장 먼저 만끽하고 싶은 감정은 무엇인가요?",
-            [
-                "나를 믿고 기다려준 사람들에게 보답했다는 자랑스럽고 감사한 마음",
-                "남들과 비교하지 않고 오롯이 내 힘으로 해냈다는 벅찬 자기효능감",
-                "누구의 간섭도 없이 내 삶을 내 뜻대로 이끌어간다는 짜릿한 주도성",
-                "그동안의 막막하고 치열했던 터널을 빠져나왔다는 후련함과 시원함",
-            ],
-        ),
-    ],
-    ConcernCategory.others: [
-        (
-            "지금 당신의 일상에 새롭게 채워 넣고 싶거나, 변화를 주고 싶은 키워드는 무엇인가요?",
-            [
-                "소중한 사람들과 더 깊게 교감하고 오해 없이 다가가는 '관계의 회복'",
-                "잔잔한 일상에 기분 좋은 자극과 호기심을 불어넣는 '새로운 재미'",
-                "내가 어떤 사람이고 무엇을 좋아했는지 다시 찾아가는 '나의 발견'",
-                "예측하기 어려운 상황 앞에서도 당황하지 않고 대처하는 '유연한 태도'",
-            ],
-        ),
-        (
-            "내 삶을 조금 더 편안하고 즐겁게 만들기 위해, 평소 어떻게 환기를 시키는 편인가요?",
-            [
-                "일기를 쓰거나 명상을 하며 내 마음을 고요하게 안아주는 시간을 가져요",
-                "생각만 하기보다는 작은 것이라도 밖으로 나가 직접 부딪혀보고 경험해요",
-                "편안한 사람들과 맛있는 것을 먹으며 수다를 떨고 에너지를 나눠요",
-                "당장 복잡한 문제는 잠시 덮어두고, 내가 좋아하는 취미에 깊이 몰입해요",
-            ],
-        ),
-        (
-            "내 마음속에 맴돌던 막연한 질문들이 맑게 갠다면, 어떤 일상을 맞이하고 싶으신가요?",
-            [
-                "잠자리에 들 때 내일이 기대되고, 걱정 없이 푹 잘 수 있는 '고요한 마음'",
-                "예전처럼 무언가를 다시 시작해 볼 용기가 차오르는 '긍정적인 활력'",
-                "남들의 시선보다 내 목소리에 귀 기울이고 나를 안아줄 수 있는 '단단함'",
-                "좋은 사람들과 편안한 미소를 지으며 함께 걷는 '따뜻한 시간'",
-            ],
-        ),
-    ],
-}
+_GUIDES_BY_ID = {guide.id: guide for guide in COUNSELING_STEP_GUIDES}
 
 
-SUBJECTIVE_QUESTION_TEXT = "위 질문으로 답하지 못 한 내용이 있으시면 여기에 작성해주세요. 없으면 비워두셔도 됩니다."
+def counseling_step_for_question_id(question_id: str) -> CounselingStepGuide:
+    try:
+        return _GUIDES_BY_ID[question_id]
+    except KeyError as exc:
+        raise ValueError(f"unknown counseling question id: {question_id}") from exc
 
 
-def classify_initial_concern(initial_concern: str) -> ConcernCategory:
-    normalized = initial_concern.casefold()
-    scores = {
-        category: sum(1 for keyword in keywords if keyword.casefold() in normalized)
-        for category, keywords in _CATEGORY_KEYWORDS.items()
-    }
-    best_category = max(scores, key=scores.get)
-    if scores[best_category] == 0:
-        return ConcernCategory.others
-    return best_category
-
-
-def fixed_questions_for_category(category: ConcernCategory) -> list[DiagnosticQuestion]:
-    questions = [
-        DiagnosticQuestion(
-            id=f"q{index}",
-            type="single_choice",
-            text=text,
-            options=[QuestionOption(id=chr(65 + option_index), label=label) for option_index, label in enumerate(options)],
-            intent_signal=intent_signal,
-        )
-        for index, ((text, options), intent_signal) in enumerate(
-            zip(_FIXED_QUESTION_BANK[category], ["현재 상황", "대처 방식", "핵심 감정"]),
-            start=1,
-        )
-    ]
-    questions.append(
-        DiagnosticQuestion(
-            id="q4",
-            type="short_text",
-            text=SUBJECTIVE_QUESTION_TEXT,
-            options=[],
-            intent_signal="추가 설명",
-        ),
-    )
-    return questions
+def next_counseling_question_id(answer_count: int) -> str:
+    if answer_count < 0 or answer_count >= len(COUNSELING_QUESTION_IDS):
+        raise ValueError("answer_count must be between 0 and 4")
+    return COUNSELING_QUESTION_IDS[answer_count]

@@ -1,21 +1,21 @@
 # 사주 심리 리딩 MVP
 
-사용자의 사주 정보와 초기 고민을 받아 고정 심리 질문과 맞춤 심층 질문을 생성하고, 그 답변을 사주 명식과 결합해 최종 풀이를 제공하는 LLM 웹 앱입니다.
+사용자의 사주 정보와 초기 고민을 받아 5단계 상담 질문을 순차 생성하고, 그 답변을 사주 명식과 결합해 최종 풀이를 제공하는 LLM 웹 앱입니다.
 
 ## 구조
 
 ```text
 backend/   FastAPI, sajupy 만세력 계산, Gemini/Groq/Ollama LLM provider, structured prompt
-frontend/  Next.js, Tailwind CSS, 3단계 화면 전환 UI
+frontend/  Next.js, Tailwind CSS, 단계별 상담 UI
 ```
 
 ## 핵심 흐름
 
 1. 사용자가 이름, 성별, 생년월일시, 초기 고민을 입력합니다.
-2. `POST /api/generate-questions`가 사주 명식을 계산하고 고정 질문 q1-q3과 선택 서술형 q4를 반환합니다.
-3. `POST /api/generate-custom-questions`가 LLM structured output으로 맞춤 질문 q5-q7을 생성하고 선택 서술형 q8을 붙입니다.
-4. 프론트엔드가 필수 답변 q1, q2, q3, q5, q6, q7과 선택 답변 q4, q8을 수집합니다.
-5. `POST /api/final-reading`이 사주 명식, 초기 고민, 질문 답변을 LLM에 전달해 최종 풀이 JSON을 생성합니다.
+2. `POST /api/generate-questions`가 사주 명식을 계산하고 5단계 상담 중 첫 질문 q1을 생성합니다.
+3. `POST /api/generate-next-question`이 이전 답변을 반영해 q2-q5를 한 단계씩 생성합니다.
+4. 프론트엔드가 필수 답변 q1, q2, q3, q4, q5를 수집합니다.
+5. `POST /api/final-reading`이 사주 명식, 초기 고민, 5단계 답변을 LLM에 전달해 최종 풀이 JSON을 생성합니다.
 
 ## 백엔드 실행
 
@@ -104,7 +104,39 @@ npm run dev
 }
 ```
 
-응답은 `saju`, `questions`, `meta`를 반환합니다. `questions`는 고정 질문 q1-q3과 선택 서술형 q4입니다.
+응답은 `saju`, `question`, `meta`를 반환합니다. `question`은 5단계 상담의 첫 질문 q1입니다.
+
+### `POST /api/generate-next-question`
+
+`/api/generate-questions` 요청 본문에 지금까지의 `answers`를 추가해 전송합니다. 답변은 반드시 q1부터 순서대로 들어가야 하며, q1 답변 뒤에는 q2, q4 답변 뒤에는 q5를 반환합니다.
+
+```json
+{
+  "name": "홍길동",
+  "gender": "female",
+  "initial_concern": "이직을 해야 할지 버텨야 할지 모르겠어요.",
+  "birth": {
+    "calendar_type": "solar",
+    "year": 1995,
+    "month": 1,
+    "day": 1,
+    "hour": 9,
+    "minute": 0,
+    "is_leap_month": false,
+    "city": "Seoul",
+    "longitude": null,
+    "use_solar_time": false
+  },
+  "answers": [
+    {
+      "question_id": "q1",
+      "question": "이 고민을 떠올릴 때 가장 큰 감정은 무엇인가요?",
+      "answer": "잘못 선택할까 봐 커지는 불안과 초조함",
+      "selected_option_ids": ["A"]
+    }
+  ]
+}
+```
 
 ### `POST /api/final-reading`
 
@@ -132,13 +164,13 @@ npm run dev
       "question_id": "q1",
       "question": "지금 고민에서 가장 크게 걸리는 것은 무엇인가요?",
       "answer": "돈과 조건, 인정받지 못하는 느낌",
-      "selected_option_ids": ["A", "B"]
+      "selected_option_ids": ["A"]
     }
   ]
 }
 ```
 
-실제 요청에서는 필수 답변 q1, q2, q3, q5, q6, q7이 필요하며 q4와 q8은 선택입니다.
+실제 요청에서는 필수 답변 q1, q2, q3, q4, q5가 순서대로 필요합니다. 직접 입력 답변은 `selected_option_ids`를 빈 배열로 보내고 `answer`에 사용자의 입력값을 담습니다.
 
 ## Structured Output
 

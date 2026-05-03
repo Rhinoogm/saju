@@ -6,33 +6,33 @@ from dataclasses import dataclass
 from app.schemas.saju import (
     FinalReadingOutput,
     FinalReadingRequest,
-    GenerateCustomQuestionsRequest,
+    GenerateNextQuestionRequest,
     GenerateQuestionsRequest,
     QuestionGenerationOutput,
     ReadingStyle,
     SajuData,
 )
-from app.services.concern_questions import CONCERN_CATEGORY_LABELS
+from app.services.concern_questions import counseling_step_for_question_id
 from app.services.prompt_store import PromptStore
 
 
-QUESTION_SYSTEM_PROMPT = """너는 내담자의 결핍이나 고통이 아닌, 그 이면에 숨겨진 긍정적인 자원과 진짜 원하는 미래를 스스로 깨닫게 돕는 전문 심리 상담가다.
-어조는 매우 따뜻하고 지지적이어야 하며, 어려운 심리학 용어 대신 내담자가 희망차고 편안하게 답할 수 있는 일상적인 한국어를 사용한다.
+QUESTION_SYSTEM_PROMPT = """너는 내담자의 고민을 5단계로 좁혀 가는 전문 심리 상담가다.
+초기 고민과 이전 답변을 짧게 반영하되, 질문은 한 번에 하나만 만든다.
+어조는 따뜻하고 지지적이며, 어려운 심리학 용어 대신 내담자가 바로 고를 수 있는 일상적인 한국어를 사용한다.
 
 Structured Output 규칙:
 1. 응답은 반드시 제공된 JSON Schema와 정확히 일치하는 JSON 객체만 반환한다.
-2. 루트 객체는 "questions" 키 하나만 가진다.
-3. "questions"는 정확히 3개이며 id는 q5, q6, q7 순서다.
-4. 모든 질문은 type="single_choice"로 만들고 options는 정확히 4개를 A, B, C, D 순서로 둔다.
-5. 직접 입력 보기는 프론트엔드가 자동으로 제공하므로 options에 "직접 입력"이나 서술형 입력란을 절대 넣지 않는다.
-6. 질문은 반드시 아래 순서의 상담 기법을 따른다: q5 반영적 질문, q6 소크라테스식 문답법, q7 니즈 좁히기.
-7. 각 질문은 한 문장으로 작성하고, 55자 안팎의 짧은 질문으로 끝낸다.
-8. 모든 보기는 "~하는 것", "~할 수 있는 여유"처럼 내담자가 자신의 마음을 고르는 형태로 자연스럽게 작성한다.
-9. 사용자를 취조하거나 가르치는 표현은 쓰지 않는다. "왜 그렇게 생각하시나요?", "그건 틀린 생각입니다" 같은 문장은 금지한다.
-10. text에는 질문 문장만 작성하고 번호, 마크다운, 선택지 표기, option label을 절대 포함하지 않는다.
-11. 선택지는 반드시 options 배열에만 작성한다.
-12. intent_signal에는 적용한 기법과 판별하려는 긍정적 니즈를 간결히 적는다.
-13. 마크다운, 코드블록, 설명, 주석, 스키마 반복 출력은 절대 하지 않는다."""
+2. 루트 객체는 "question" 키 하나만 가진다.
+3. question.id는 사용자 프롬프트의 target_id와 정확히 같아야 한다.
+4. question.type은 반드시 "single_choice"다.
+5. options는 정확히 4개를 A, B, C, D 순서로 둔다.
+6. 직접 입력 보기는 프론트엔드가 자동 제공하므로 options에 "직접 입력", "기타", "직접 작성"을 절대 넣지 않는다.
+7. text에는 질문 문장만 작성하고 번호, 마크다운, 선택지 표기, option label을 포함하지 않는다.
+8. 질문은 한 문장으로, 70자 안팎으로 짧게 쓴다.
+9. 선택지는 내담자가 자신의 상태나 바람을 고르는 자연스러운 문장으로 쓴다.
+10. 사용자를 취조하거나 가르치는 표현은 쓰지 않는다.
+11. intent_signal에는 단계명과 판별하려는 핵심 신호를 간결히 적는다.
+12. 마크다운, 코드블록, 설명, 주석, 스키마 반복 출력은 절대 하지 않는다."""
 
 
 FINAL_SYSTEM_PROMPT_TRADITIONAL = """<role_definition>
@@ -155,51 +155,30 @@ FINAL_SYSTEM_PROMPT_DIRECT = """<system_override>
 FINAL_SYSTEM_PROMPT = FINAL_SYSTEM_PROMPT_TRADITIONAL
 
 
-QUESTION_USER_PROMPT_TEMPLATE = """<objective>
-아래 입력을 분석하여, 내담자가 자신의 진정한 목표를 인지하고 우선순위를 좁혀갈 수 있도록 돕는 맞춤형 심층 질문 3개를 생성하라.
-</objective>
+QUESTION_USER_PROMPT_TEMPLATE = """<task>
+현재 상담 단계에 맞는 질문 1개와 선택지 4개를 생성한다.
+단계 가이드의 목적은 반드시 지키되, 질문과 선택지는 initial_concern과 previous_answers의 표현을 반영해 맞춤 작성한다.
+</task>
 
 <input_data>
-  <category>
-  {category_json}
-  </category>
+  <step_guide>
+  {step_guide_json}
+  </step_guide>
   <user_profile>
   {profile_json}
   </user_profile>
-  <fixed_answers>
-  {fixed_answers_json}
-  </fixed_answers>
+  <previous_answers>
+  {previous_answers_json}
+  </previous_answers>
 </input_data>
 
-<data_interpretation>
-- q1 답변: 내담자가 바라는 긍정적인 변화와 방향(What)
-- q2 답변: 그 방향을 위해 현재 시도하고 있는 작고 긍정적인 노력(How)
-- q3 답변: 목표를 이루었을 때 기대하는 긍정적인 감정(Why)
-- q4 답변: 추가 맥락 (비어 있으면 무시할 것)
-</data_interpretation>
-
 <generation_rules>
-- 반드시 질문은 3개만 만들 것. (id: q5, q6, q7 순서)
-- 각 질문은 한 문장으로, 55자 안팎으로 짧게 쓸 것 (최대 90자 엄수).
-- 공감 문장은 길게 풀지 말고 "말씀을 보면", "그 마음에는"처럼 짧게 넘길 것.
-- 각 질문마다 options는 정확히 4개(A, B, C, D)를 작성할 것. ('직접 입력' 옵션 절대 생성 금지)
-- 상담 카테고리의 맥락을 반영하되, 고정 질문의 원문을 앵무새처럼 반복하지 말 것.
-- 결핍, 고통보다 '원하는 변화'와 '긍정적 기대'에 초점을 둘 것.
+- target_id는 step_guide.id다. question.id를 반드시 target_id와 같게 작성한다.
+- question.text는 step_guide.base_question을 그대로 복사하지 말고, 같은 의도를 유지하며 사용자 고민에 맞춘다.
+- options는 step_guide.base_options의 4가지 방향을 모두 살리되, 사용자 맥락에 맞게 자연스럽게 바꾼다.
+- 이전 답변이 있으면 다음 단계 질문에 반영하되, 답변 내용을 길게 요약하지 않는다.
+- 빠른 응답을 위해 불필요한 설명, 긴 공감, 사주 명식 언급은 넣지 않는다.
 </generation_rules>
-
-<question_framework>
-[q5] 반영적 질문 (동기 강화 면담 기법)
-- 방법: 초기 상담 내용과 q3의 기대 감정을 짧게 비춘 뒤, 가장 중요한 가치를 묻는다.
-- options: 서로 다른 핵심 가치나 심리적 동기 4가지 제시.
-
-[q6] 소크라테스식 문답법 (인지행동치료 기법)
-- 방법: q2의 현재 노력을 짧게 인정한 뒤, 그 노력이 쌓였을 때 가장 먼저 발견할 긍정적 변화를 묻는다.
-- options: 일상, 태도, 주변 관계에서 나타날 수 있는 긍정적인 파급 효과 4가지 제시.
-
-[q7] 니즈 좁히기 (깔때기 기법)
-- 방법: 여러 조건 중 딱 하나만 먼저 고르게 하여 최우선 순위를 묻는다.
-- options: 내담자의 상황에서 현실적이고 매력적인 최종 해결 조건이나 보상 4가지 제시.
-</question_framework>
 """
 
 
@@ -307,38 +286,38 @@ def _compact_saju_payload(saju: SajuData) -> dict:
 ANSWER_PROMPT_FIELDS = {"question_id", "question", "answer"}
 
 
-def _profile_payload(profile: GenerateQuestionsRequest | GenerateCustomQuestionsRequest | FinalReadingRequest) -> dict:
-    payload = {
+def _profile_payload(profile: GenerateQuestionsRequest | GenerateNextQuestionRequest | FinalReadingRequest) -> dict:
+    return {
         "name": profile.name,
         "gender": profile.gender.value,
         "initial_concern": profile.initial_concern,
     }
-    category = getattr(profile, "category", None)
-    if category is not None:
-        payload["concern_category"] = {
-            "id": category.value,
-            "label": CONCERN_CATEGORY_LABELS[category],
-        }
-    return payload
 
 
 def _answers_payload(answers: list) -> list[dict]:
     return [answer.model_dump(mode="json", include=ANSWER_PROMPT_FIELDS) for answer in answers]
 
 
-def build_custom_question_generation_prompt(payload: GenerateCustomQuestionsRequest, *, prompt_store: PromptStore | None = None) -> BuiltPrompt:
+def build_question_generation_prompt(
+    payload: GenerateQuestionsRequest | GenerateNextQuestionRequest,
+    *,
+    target_question_id: str,
+    prompt_store: PromptStore | None = None,
+) -> BuiltPrompt:
+    guide = counseling_step_for_question_id(target_question_id)
+    previous_answers = getattr(payload, "answers", [])
     schema = QuestionGenerationOutput.model_json_schema()
-    template = _resolve_system_prompt(prompt_store, "question_user_prompt", QUESTION_USER_PROMPT_TEMPLATE)
+    template = _resolve_system_prompt(prompt_store, "counseling_question_user_prompt", QUESTION_USER_PROMPT_TEMPLATE)
     prompt = _render_prompt_template(
         template,
         {
-            "category_json": _json_for_prompt({"id": payload.category.value, "label": CONCERN_CATEGORY_LABELS[payload.category]}),
+            "step_guide_json": _json_for_prompt(guide.as_prompt_payload()),
             "profile_json": _json_for_prompt(_profile_payload(payload)),
-            "fixed_answers_json": _json_for_prompt(_answers_payload(payload.fixed_answers)),
+            "previous_answers_json": _json_for_prompt(_answers_payload(previous_answers)),
         },
     )
     return BuiltPrompt(
-        system=_resolve_system_prompt(prompt_store, "question_system_prompt", QUESTION_SYSTEM_PROMPT),
+        system=_resolve_system_prompt(prompt_store, "counseling_question_system_prompt", QUESTION_SYSTEM_PROMPT),
         prompt=prompt,
         schema=schema,
         schema_name="QuestionGenerationOutput",

@@ -12,20 +12,20 @@ import {
   ApiError,
   DiagnosticQuestion,
   FinalReadingResponse,
-  GenerateCustomQuestionsResponse,
   GenerateQuestionsResponse,
   InitialProfile,
   QuestionAnswer,
   ReadingStyle,
-  generateCustomQuestions,
+  generateNextQuestion,
   generateQuestions,
   requestFinalReading,
   requestSajuOnly,
 } from "@/lib/api";
 
-type Step = "hall" | "initial" | "fixed" | "custom" | "result" | "saju";
+type Step = "hall" | "initial" | "counseling" | "result" | "saju";
 
 const ADMIN_STORAGE_KEY = "saju_admin_api_key";
+const TOTAL_COUNSELING_STEPS = 5;
 
 const readingStyleOptions: {
   style: ReadingStyle;
@@ -88,13 +88,13 @@ function requestErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-function emptyAnswers(questions: DiagnosticQuestion[]): QuestionAnswer[] {
-  return questions.map((question) => ({
+function emptyAnswer(question: DiagnosticQuestion): QuestionAnswer {
+  return {
     question_id: question.id,
     question: question.text,
     answer: "",
     selected_option_ids: [],
-  }));
+  };
 }
 
 function apiBaseUrl() {
@@ -111,9 +111,9 @@ export default function Home() {
   const [readingStyle, setReadingStyle] = useState<ReadingStyle>("traditional");
   const [profile, setProfile] = useState<InitialProfile>(defaultProfile);
   const [questionResult, setQuestionResult] = useState<GenerateQuestionsResponse | null>(null);
-  const [fixedAnswers, setFixedAnswers] = useState<QuestionAnswer[]>([]);
-  const [customQuestionResult, setCustomQuestionResult] = useState<GenerateCustomQuestionsResponse | null>(null);
-  const [customAnswers, setCustomAnswers] = useState<QuestionAnswer[]>([]);
+  const [questions, setQuestions] = useState<DiagnosticQuestion[]>([]);
+  const [answers, setAnswers] = useState<QuestionAnswer[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [finalResult, setFinalResult] = useState<FinalReadingResponse | null>(null);
   const [sajuOnlyResult, setSajuOnlyResult] = useState<import("@/lib/api").SajuOnlyResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -122,6 +122,8 @@ export default function Home() {
   const [adminPassword, setAdminPassword] = useState("");
   const [adminGateLoading, setAdminGateLoading] = useState(false);
   const [adminGateError, setAdminGateError] = useState("");
+  const currentQuestion = questions[currentQuestionIndex];
+  const currentAnswer = answers[currentQuestionIndex];
 
   async function handleGenerateQuestions() {
     if (profile.initial_concern.trim().length === 0) {
@@ -136,10 +138,10 @@ export default function Home() {
     try {
       const response = await generateQuestions(profile);
       setQuestionResult(response);
-      setFixedAnswers(emptyAnswers(response.questions));
-      setCustomQuestionResult(null);
-      setCustomAnswers([]);
-      setStep("fixed");
+      setQuestions([response.question]);
+      setAnswers([emptyAnswer(response.question)]);
+      setCurrentQuestionIndex(0);
+      setStep("counseling");
     } catch (error) {
       setError(requestErrorMessage(error, "질문 생성 중 오류가 발생했어요."));
     } finally {
@@ -152,9 +154,9 @@ export default function Home() {
     setError("");
     setFinalResult(null);
     setQuestionResult(null);
-    setFixedAnswers([]);
-    setCustomQuestionResult(null);
-    setCustomAnswers([]);
+    setQuestions([]);
+    setAnswers([]);
+    setCurrentQuestionIndex(0);
 
     try {
       const response = await requestSajuOnly({
@@ -171,61 +173,67 @@ export default function Home() {
     }
   }
 
-  async function handleGenerateCustomQuestions() {
-    if (!questionResult) return;
+  async function handleCounselingSubmit() {
+    if (!questionResult || !currentQuestion || !currentAnswer) return;
 
-    const completedFixedAnswers = fixedAnswers.filter((answer) => answer.answer.trim().length > 0);
+    const completedAnswers = answers.slice(0, currentQuestionIndex + 1).map((answer) => ({
+      ...answer,
+      answer: answer.answer.trim(),
+    }));
     setLoading(true);
     setError("");
-    setFinalResult(null);
 
     try {
-      const response = await generateCustomQuestions({
+      if (completedAnswers.length >= TOTAL_COUNSELING_STEPS) {
+        const response = await requestFinalReading({
+          ...profile,
+          reading_style: readingStyle,
+          answers: completedAnswers,
+        });
+        setFinalResult(response);
+        setStep("result");
+        return;
+      }
+
+      const response = await generateNextQuestion({
         ...profile,
-        category: questionResult.category,
-        fixed_answers: completedFixedAnswers,
+        answers: completedAnswers,
       });
-      setCustomQuestionResult(response);
-      setCustomAnswers(emptyAnswers(response.questions));
-      setStep("custom");
+      setQuestions((current) => [...current.slice(0, currentQuestionIndex + 1), response.question]);
+      setAnswers((current) => [...current.slice(0, currentQuestionIndex + 1), emptyAnswer(response.question)]);
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
     } catch (error) {
-      setError(requestErrorMessage(error, "맞춤 질문 생성 중 오류가 발생했어요."));
+      setError(requestErrorMessage(error, completedAnswers.length >= TOTAL_COUNSELING_STEPS ? "최종 풀이 생성 중 오류가 발생했어요." : "다음 질문 생성 중 오류가 발생했어요."));
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleFinalReading() {
-    if (!questionResult) return;
-
-    const completedFixedAnswers = fixedAnswers.filter((answer) => answer.answer.trim().length > 0);
-    const completedCustomAnswers = customAnswers.filter((answer) => answer.answer.trim().length > 0);
-    setLoading(true);
+  function handleQuestionBack() {
     setError("");
-
-    try {
-      const response = await requestFinalReading({
-        ...profile,
-        category: questionResult.category,
-        reading_style: readingStyle,
-        answers: [...completedFixedAnswers, ...completedCustomAnswers],
-      });
-      setFinalResult(response);
-      setStep("result");
-    } catch (error) {
-      setError(requestErrorMessage(error, "최종 풀이 생성 중 오류가 발생했어요."));
-    } finally {
-      setLoading(false);
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex((current) => current - 1);
+      return;
     }
+    setStep("initial");
+  }
+
+  function handleCurrentAnswerChange(nextAnswer: QuestionAnswer) {
+    setAnswers((current) => {
+      const next = current.slice(0, currentQuestionIndex + 1);
+      next[currentQuestionIndex] = nextAnswer;
+      return next;
+    });
+    setQuestions((current) => current.slice(0, currentQuestionIndex + 1));
   }
 
   function restart() {
     setStep("hall");
     setReadingStyle("traditional");
     setQuestionResult(null);
-    setFixedAnswers([]);
-    setCustomQuestionResult(null);
-    setCustomAnswers([]);
+    setQuestions([]);
+    setAnswers([]);
+    setCurrentQuestionIndex(0);
     setFinalResult(null);
     setSajuOnlyResult(null);
     setError("");
@@ -248,7 +256,7 @@ export default function Home() {
 
     setAdminGateLoading(true);
     try {
-      const response = await fetch(`${apiBaseUrl()}/api/admin/prompts/question_system_prompt`, {
+      const response = await fetch(`${apiBaseUrl()}/api/admin/prompts/counseling_question_system_prompt`, {
         headers: {
           "X-Admin-Key": password,
         },
@@ -338,12 +346,11 @@ export default function Home() {
       )}
 
       <div className="mx-auto max-w-5xl">
-        {step !== "hall" && (
-          <div className="mb-5 grid grid-cols-4 gap-2">
+        {step !== "hall" && step !== "saju" && (
+          <div className="mb-5 grid grid-cols-3 gap-2">
             {[
               ["initial", "입력"],
-              ["fixed", "기본"],
-              ["custom", "심층"],
+              ["counseling", "상담"],
               ["result", "결과"],
             ].map(([key, label], index, steps) => {
               const active = step === key;
@@ -419,42 +426,34 @@ export default function Home() {
           </>
         )}
 
-        {step === "fixed" && questionResult && (
+        {step === "counseling" && currentQuestion && currentAnswer && (
           <QuestionsForm
-            questions={questionResult.questions}
-            answers={fixedAnswers}
+            key={currentQuestion.id}
+            question={currentQuestion}
+            answer={currentAnswer}
             loading={loading}
-            eyebrow={`${questionResult.category_label} · 기본 질문`}
-            title="기본 상담지"
-            description="초기 고민을 기준으로 고른 카테고리의 기본 질문입니다. 마지막 문항은 비워두어도 됩니다."
-            onBack={() => setStep("initial")}
-            onAnswerChange={setFixedAnswers}
-            onSubmit={handleGenerateCustomQuestions}
-            submitLabel="맞춤 질문 받기"
-            loadingLabel="맞춤 질문 생성 중"
-            optionalQuestionIds={["q4"]}
-          />
-        )}
-
-        {step === "custom" && customQuestionResult && (
-          <QuestionsForm
-            questions={customQuestionResult.questions}
-            answers={customAnswers}
-            loading={loading}
-            eyebrow="맞춤 심층 질문"
-            title="마음의 방향을 좁혀볼게요"
-            description="기본 답변을 바탕으로 만든 질문입니다. 떠오르는 만큼 편하게 적어주세요."
-            onBack={() => setStep("fixed")}
-            onAnswerChange={setCustomAnswers}
-            onSubmit={handleFinalReading}
-            submitLabel="최종 풀이 보기"
-            loadingLabel="최종 풀이 생성 중"
-            optionalQuestionIds={["q8"]}
+            stepIndex={currentQuestionIndex + 1}
+            eyebrow="5단계 상담"
+            title="마음의 방향을 하나씩 좁혀볼게요"
+            description="초기 고민과 이전 답변을 바탕으로 만든 질문입니다. 가장 가까운 답을 골라주세요."
+            onBack={handleQuestionBack}
+            onAnswerChange={handleCurrentAnswerChange}
+            onSubmit={handleCounselingSubmit}
+            submitLabel={currentQuestionIndex + 1 >= TOTAL_COUNSELING_STEPS ? "최종 풀이 보기" : "다음"}
+            loadingLabel={currentQuestionIndex + 1 >= TOTAL_COUNSELING_STEPS ? "최종 풀이 생성 중" : "다음 질문 생성 중"}
           />
         )}
 
         {step === "result" && finalResult && (
-          <ReadingResult result={finalResult} profileName={profile.name} onBack={() => setStep("custom")} onRestart={restart} />
+          <ReadingResult
+            result={finalResult}
+            profileName={profile.name}
+            onBack={() => {
+              setStep("counseling");
+              setCurrentQuestionIndex(Math.max(0, answers.length - 1));
+            }}
+            onRestart={restart}
+          />
         )}
 
         {step === "saju" && sajuOnlyResult && (

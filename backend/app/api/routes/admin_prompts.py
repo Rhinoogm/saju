@@ -21,8 +21,8 @@ router = APIRouter(prefix="/api/admin/prompts", tags=["admin"])
 settings_router = APIRouter(prefix="/api/admin/settings", tags=["admin"])
 
 DEFAULT_PROMPTS: dict[str, str] = {
-    "question_system_prompt": QUESTION_SYSTEM_PROMPT,
-    "question_user_prompt": QUESTION_USER_PROMPT_TEMPLATE,
+    "counseling_question_system_prompt": QUESTION_SYSTEM_PROMPT,
+    "counseling_question_user_prompt": QUESTION_USER_PROMPT_TEMPLATE,
     "final_system_prompt_traditional": FINAL_SYSTEM_PROMPT_TRADITIONAL,
     "final_system_prompt_empathetic": FINAL_SYSTEM_PROMPT_EMPATHETIC,
     "final_system_prompt_direct": FINAL_SYSTEM_PROMPT_DIRECT,

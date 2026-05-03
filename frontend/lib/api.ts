@@ -1,7 +1,6 @@
 export type CalendarType = "solar" | "lunar";
 export type Gender = "male" | "female" | "other";
-export type QuestionType = "single_choice" | "short_text";
-export type ConcernCategory = "romance" | "career" | "finance" | "health" | "academics" | "others";
+export type QuestionType = "single_choice";
 export type ReadingStyle = "traditional" | "empathetic" | "direct";
 
 export interface BirthInfo {
@@ -90,19 +89,16 @@ export interface ResponseMeta {
 
 export interface GenerateQuestionsResponse {
   saju: SajuData;
-  category: ConcernCategory;
-  category_label: string;
-  questions: DiagnosticQuestion[];
+  question: DiagnosticQuestion;
   meta: ResponseMeta;
 }
 
-export interface GenerateCustomQuestionsRequest extends InitialProfile {
-  category: ConcernCategory;
-  fixed_answers: QuestionAnswer[];
+export interface GenerateNextQuestionRequest extends InitialProfile {
+  answers: QuestionAnswer[];
 }
 
-export interface GenerateCustomQuestionsResponse {
-  questions: DiagnosticQuestion[];
+export interface GenerateNextQuestionResponse {
+  question: DiagnosticQuestion;
   meta: ResponseMeta;
 }
 
@@ -211,11 +207,11 @@ export function generateQuestions(payload: InitialProfile): Promise<GenerateQues
   return postJson<GenerateQuestionsResponse>("/api/generate-questions", payload);
 }
 
-export function generateCustomQuestions(payload: GenerateCustomQuestionsRequest): Promise<GenerateCustomQuestionsResponse> {
-  return postJson<GenerateCustomQuestionsResponse>("/api/generate-custom-questions", payload);
+export function generateNextQuestion(payload: GenerateNextQuestionRequest): Promise<GenerateNextQuestionResponse> {
+  return postJson<GenerateNextQuestionResponse>("/api/generate-next-question", payload);
 }
 
-export function requestFinalReading(payload: InitialProfile & { category?: ConcernCategory; reading_style?: ReadingStyle; answers: QuestionAnswer[] }): Promise<FinalReadingResponse> {
+export function requestFinalReading(payload: InitialProfile & { reading_style?: ReadingStyle; answers: QuestionAnswer[] }): Promise<FinalReadingResponse> {
   return postJson<FinalReadingResponse>("/api/final-reading", payload);
 }
 

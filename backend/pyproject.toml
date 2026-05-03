@@ -1,7 +1,7 @@
 [project]
 name = "saju-backend"
 version = "0.1.0"
-description = "FastAPI backend for a two-step saju and psychology reading MVP."
+description = "FastAPI backend for a five-step saju and psychology reading MVP."
 requires-python = ">=3.10"
 dependencies = [
   "fastapi>=0.115.0,<1.0.0",
