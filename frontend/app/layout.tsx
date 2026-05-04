@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "사주 심리 리딩",
-  description: "사주 명식과 진단 질문을 결합한 2단계 개인화 리딩 MVP",
+  title: "Saju-i 사주 심리 리딩",
+  description: "사주 명식과 5단계 상담 답변을 결합한 개인화 리딩",
 };
 
 export const viewport: Viewport = {
@@ -19,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className="min-h-screen bg-cloud text-ink antialiased">{children}</body>
+      <body className="min-h-screen bg-background text-foreground antialiased">{children}</body>
     </html>
   );
 }

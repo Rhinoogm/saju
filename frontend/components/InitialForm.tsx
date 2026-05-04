@@ -7,10 +7,10 @@ import { useMemo } from "react";
 import type { InitialProfile } from "@/lib/api";
 
 const inputClass =
-  "h-14 w-full rounded-lg border border-[#eadfce] bg-white px-4 text-base font-bold text-ink shadow-[0_8px_24px_rgba(83,64,42,0.06)] outline-none transition placeholder:text-stone-400 focus:border-coral focus:ring-4 focus:ring-coral/15";
+  "h-14 w-full rounded-lg border border-border bg-surface px-4 text-base font-bold text-foreground shadow-[0_8px_24px_rgba(83,64,42,0.05)] outline-none transition placeholder:text-stone-400 focus:border-terracotta focus:ring-4 focus:ring-terracotta/15 dark:bg-[#242321] dark:shadow-none";
 const selectClass = `${inputClass} appearance-none pr-11`;
-const labelClass = "mb-2 flex items-center gap-2 text-sm font-black text-stone-700";
-const helperLabelClass = "mb-1.5 flex items-center gap-1.5 text-xs font-black text-stone-500";
+const labelClass = "mb-2 flex items-center gap-2 text-sm font-black text-stone-700 dark:text-stone-200";
+const helperLabelClass = "mb-1.5 flex items-center gap-1.5 text-xs font-black text-stone-500 dark:text-stone-400";
 
 const months = Array.from({ length: 12 }, (_, index) => index + 1);
 const hours = Array.from({ length: 24 }, (_, index) => index);
@@ -91,14 +91,14 @@ export function InitialForm({ profile, loading, onChange, onSubmit, onSajuOnly }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 rounded-lg border border-[#eadfce] bg-[#fffdf8] p-4 shadow-soft sm:p-6">
+    <form onSubmit={handleSubmit} className="space-y-6 rounded-lg border border-border bg-surface p-4 shadow-ritual sm:p-6 dark:shadow-ritual-dark">
       <section>
         <div className="mb-6">
-          <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#fff0b9] px-3 py-1.5 text-xs font-black text-[#6e5428]">
+          <p className="mb-3 inline-flex items-center gap-2 rounded-lg bg-surface-muted px-3 py-1.5 text-xs font-black text-sage dark:text-[#c9d4bd]">
             <Sparkles size={14} aria-hidden /> 사주 심리 리딩
           </p>
-          <h1 className="text-4xl font-black leading-tight tracking-normal text-ink sm:text-5xl">프로필을 입력해주세요.</h1>
-          <p className="mt-3 text-sm font-bold leading-6 text-stone-500">생년월일시와 출생 지역을 기준으로 만세력을 계산합니다.</p>
+          <h1 className="font-serif text-4xl font-black leading-tight tracking-normal text-foreground sm:text-5xl">프로필을 입력해주세요.</h1>
+          <p className="mt-3 break-keep text-sm font-bold leading-6 text-stone-600 dark:text-stone-300">생년월일시와 출생 지역을 기준으로 만세력을 계산합니다.</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -129,19 +129,19 @@ export function InitialForm({ profile, loading, onChange, onSubmit, onSajuOnly }
         </div>
       </section>
 
-      <section className="rounded-lg border border-[#f0dfc4] bg-[#fff8e8] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-        <div className="mb-4 flex items-center gap-2 text-sm font-black text-stone-700">
+      <section className="rounded-lg border border-border bg-surface-muted p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] dark:shadow-none">
+        <div className="mb-4 flex items-center gap-2 text-sm font-black text-stone-700 dark:text-stone-200">
           <CalendarDays size={17} aria-hidden /> 생년월일시
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-2 rounded-lg border border-[#eadfce] bg-white p-1">
+        <div className="mb-4 grid grid-cols-2 gap-2 rounded-lg border border-border bg-surface p-1">
           {(["solar", "lunar"] as const).map((type) => (
             <button
               key={type}
               type="button"
               onClick={() => updateBirth("calendar_type", type)}
               className={`h-11 rounded-md px-3 text-sm font-black transition ${
-                profile.birth.calendar_type === type ? "bg-[#73c8b7] text-white shadow-sm" : "text-stone-600 hover:bg-[#f7fbf8]"
+                profile.birth.calendar_type === type ? "bg-sage text-white shadow-sm" : "text-stone-600 hover:bg-surface-muted dark:text-stone-300"
               }`}
             >
               {type === "solar" ? "양력" : "음력"}
@@ -193,26 +193,26 @@ export function InitialForm({ profile, loading, onChange, onSubmit, onSajuOnly }
           </SelectField>
 
           {profile.birth.calendar_type === "lunar" && (
-            <label className="flex h-14 items-center gap-3 rounded-lg border border-[#eadfce] bg-white px-4 text-sm font-black text-stone-700 shadow-[0_8px_24px_rgba(83,64,42,0.06)]">
+            <label className="flex h-14 items-center gap-3 rounded-lg border border-border bg-surface px-4 text-sm font-black text-stone-700 shadow-[0_8px_24px_rgba(83,64,42,0.05)] dark:text-stone-200 dark:shadow-none">
               <input
                 type="checkbox"
                 checked={profile.birth.is_leap_month}
                 onChange={(event) => updateBirth("is_leap_month", event.target.checked)}
-                className="h-5 w-5 accent-coral"
+                className="h-5 w-5 accent-terracotta"
               />
               윤달
             </label>
           )}
         </div>
 
-        <details className="mt-4 rounded-lg border border-[#eadfce] bg-white shadow-[0_8px_24px_rgba(83,64,42,0.06)]">
-          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-black text-stone-700">
+        <details className="mt-4 rounded-lg border border-border bg-surface shadow-[0_8px_24px_rgba(83,64,42,0.05)] dark:shadow-none">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-black text-stone-700 dark:text-stone-200">
             <span className="flex items-center gap-2">
               <MapPin size={16} aria-hidden /> 출생 지역과 태양시
             </span>
             <ChevronDown size={17} aria-hidden />
           </summary>
-          <div className="grid gap-3 border-t border-stone-100 p-4 sm:grid-cols-2">
+          <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-2">
             <label>
               <span className={helperLabelClass}>출생 도시</span>
               <input className={inputClass} value={profile.birth.city} onChange={(event) => updateBirth("city", event.target.value)} />
@@ -228,12 +228,12 @@ export function InitialForm({ profile, loading, onChange, onSubmit, onSajuOnly }
                 placeholder="126.9780"
               />
             </label>
-            <label className="flex h-14 items-center gap-3 rounded-lg bg-[#f4fbf7] px-4 text-sm font-black text-stone-700 sm:col-span-2">
+            <label className="flex h-14 items-center gap-3 rounded-lg bg-surface-muted px-4 text-sm font-black text-stone-700 sm:col-span-2 dark:text-stone-200">
               <input
                 type="checkbox"
                 checked={profile.birth.use_solar_time}
                 onChange={(event) => updateBirth("use_solar_time", event.target.checked)}
-                className="h-5 w-5 accent-coral"
+                className="h-5 w-5 accent-terracotta"
               />
               태양시 보정 사용
             </label>
@@ -258,14 +258,14 @@ export function InitialForm({ profile, loading, onChange, onSubmit, onSajuOnly }
           type="button"
           onClick={onSajuOnly}
           disabled={loading}
-          className="flex h-16 w-full items-center justify-center gap-2 rounded-full bg-honey px-5 text-lg font-black text-[#4d3b21] shadow-[0_14px_30px_rgba(241,190,77,0.34)] transition hover:bg-[#f5c85f] disabled:cursor-not-allowed disabled:opacity-70"
+          className="flex h-16 w-full items-center justify-center gap-2 rounded-lg bg-sage px-5 text-lg font-black text-white shadow-ritual transition hover:bg-[#4c5d50] disabled:cursor-not-allowed disabled:opacity-70"
         >
           만세력 보러가기
         </button>
         <button
           type="submit"
           disabled={loading}
-          className="flex h-16 w-full items-center justify-center gap-2 rounded-full bg-[#e9ecef] px-5 text-lg font-black text-stone-700 shadow-[0_12px_24px_rgba(82,70,58,0.08)] transition hover:bg-[#dde8e2] disabled:cursor-not-allowed disabled:opacity-70"
+          className="flex h-16 w-full items-center justify-center gap-2 rounded-lg bg-terracotta px-5 text-lg font-black text-white shadow-[0_12px_24px_rgba(197,123,87,0.22)] transition hover:bg-[#b46d4d] disabled:cursor-not-allowed disabled:opacity-70"
         >
           {loading ? <LoaderCircle className="animate-spin" size={20} aria-hidden /> : <Send size={19} aria-hidden />}
           {loading ? "무료 서버 응답 대기 중" : "상담 시작"}

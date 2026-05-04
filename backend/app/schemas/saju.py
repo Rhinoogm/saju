@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 OptionId = Annotated[str, Field(pattern="^[A-D]$")]
+ShareStrength = Annotated[str, Field(min_length=2, max_length=24)]
 OPTION_MARKER_RE = re.compile(r"\s*(?:\([A-D]\)|[A-D][.)]|[①②③④])\s*")
 
 
@@ -211,13 +212,6 @@ class FinalReadingRequest(InitialProfile):
         return self
 
 
-class ReadingSection(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    title: str = Field(..., min_length=2, max_length=36)
-    body: str = Field(..., min_length=60, max_length=700)
-
-
 class ReadingCareSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -227,30 +221,37 @@ class ReadingCareSection(BaseModel):
     detail: str = Field(..., min_length=200, max_length=1200)
 
 
-class LuckRecipeItem(BaseModel):
+class PeriodGuidanceItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    category: str = Field(..., min_length=2, max_length=20)
-    item: str = Field(..., min_length=1, max_length=40)
-    reason: str = Field(..., min_length=10, max_length=180)
+    label: str = Field(..., min_length=2, max_length=36)
+    saju_feature: str = Field(..., min_length=10, max_length=180)
+    good: str = Field(..., min_length=20, max_length=260)
+    caution: str = Field(..., min_length=20, max_length=260)
+
+
+class ShareCard(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    core_saju_feature: str = Field(..., min_length=10, max_length=160)
+    balancing_need: str = Field(..., min_length=8, max_length=120)
+    daily_element: str = Field(..., min_length=1, max_length=50)
+    daily_reason: str = Field(..., min_length=10, max_length=180)
+    strengths: list[ShareStrength] = Field(..., min_length=2, max_length=3)
 
 
 class FinalReadingOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     reading_title: str = Field(..., min_length=4, max_length=80)
-    core_message: str = Field(..., min_length=8, max_length=120)
-    situation_mirror: ReadingCareSection
+    core_message: str = Field(..., min_length=8, max_length=160)
+    desired_answer: str = Field(..., min_length=20, max_length=260)
     saju_insight: ReadingCareSection
     clear_solution: ReadingCareSection
-    saju_vibe: ReadingCareSection
     secret_talent: ReadingCareSection
-    answer_signals: list[str] = Field(..., min_length=3, max_length=5)
-    answer_signal_summary: str = Field(..., min_length=30, max_length=180)
     saju_basis: list[str] = Field(..., min_length=3, max_length=5)
-    timing_points: list[str] = Field(..., min_length=3, max_length=3)
-    luck_recipe: list[LuckRecipeItem] = Field(..., min_length=4, max_length=4)
-    re_engagement_hook: ReadingSection
+    period_guidance: list[PeriodGuidanceItem] = Field(..., min_length=3, max_length=3)
+    share_card: ShareCard
     caution: str = Field(..., min_length=8, max_length=240)
 
 

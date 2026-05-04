@@ -109,29 +109,31 @@ export interface ReadingCareSection {
   detail: string;
 }
 
-export interface LuckRecipeItem {
-  category: string;
-  item: string;
-  reason: string;
+export interface PeriodGuidanceItem {
+  label: string;
+  saju_feature: string;
+  good: string;
+  caution: string;
+}
+
+export interface ShareCard {
+  core_saju_feature: string;
+  balancing_need: string;
+  daily_element: string;
+  daily_reason: string;
+  strengths: string[];
 }
 
 export interface FinalReading {
   reading_title: string;
   core_message: string;
-  situation_mirror: ReadingCareSection;
+  desired_answer: string;
   saju_insight: ReadingCareSection;
   clear_solution: ReadingCareSection;
-  saju_vibe: ReadingCareSection;
   secret_talent: ReadingCareSection;
-  answer_signals: string[];
-  answer_signal_summary: string;
   saju_basis: string[];
-  timing_points: string[];
-  luck_recipe: LuckRecipeItem[];
-  re_engagement_hook: {
-    title: string;
-    body: string;
-  };
+  period_guidance: PeriodGuidanceItem[];
+  share_card: ShareCard;
   caution: string;
 }
 

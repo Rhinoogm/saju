@@ -79,37 +79,45 @@ def test_final_prompt_requests_report_structure(sample_request, sample_saju_data
     assert "프리미엄 사주 앱 'Saju-i'" in built.prompt
     assert "hashtags" not in built.prompt
     assert "해시태그" not in built.prompt
-    assert "situation_mirror" in built.prompt
+    assert "desired_answer" in built.prompt
     assert "saju_insight" in built.prompt
     assert "clear_solution" in built.prompt
-    assert "re_engagement_hook" in built.prompt
-    assert "saju_vibe" in built.prompt
-    assert "luck_recipe" in built.prompt
-    assert "전문가 데이터" in built.prompt
-    assert "감성 레시피" in built.prompt
-    assert "timing_points" in built.prompt
+    assert "secret_talent" in built.prompt
+    assert "period_guidance" in built.prompt
+    assert "share_card" in built.prompt
+    assert "strengths" in built.prompt
+    assert "작은 체크 노트" in built.prompt
+    assert "고객이 진짜 듣고 싶었던 말" in built.prompt
+    assert "상담 분석 라벨을 절대 노출하지 않는다" in built.prompt
     assert "summary" in built.prompt
     assert "detail" in built.prompt
     assert "`body`를 절대 만들지 않는다" in built.prompt
-    assert "`re_engagement_hook`은 핵심 리딩 필드가 아니므로 예외적으로 `title`, `body`만 가진다" in built.prompt
+    assert "스키마에 없는 추가 필드" in built.prompt
     assert "`caution`은 객체가 아니라 문자열 필드" in built.prompt
-    assert "내부적으로만 사용할 사주 키워드" in built.prompt
-    assert "감탄사나 이모지가 들어가면 3문장까지 허용" in built.prompt
-    assert "스마트폰 화면에서 짧게 보이는 호흡" in built.prompt
-    assert "최대 3개의 마침표" in built.prompt
     assert "<qna_data>" in built.prompt
     assert "<budget_and_quality_control>" in built.prompt
+    assert "구체 날짜" in built.prompt
+    assert "이번 주" in built.prompt
+    assert "여러 추천 목록처럼 늘어놓지 않는다" in built.prompt
     assert "데이터 격리(Anti-Anchoring)" in built.prompt
-    assert "answer_signal_summary" in built.prompt
-    assert "secret_talent" in built.prompt
+    assert "answer_signal_summary" not in built.prompt
+    assert "situation_mirror" not in built.prompt
+    assert "luck_recipe" not in built.prompt
     assert sample_request.initial_concern in built.prompt
     assert built.schema_name == "FinalReadingOutput"
-    assert "situation_mirror" in built.schema["properties"]
+    assert "desired_answer" in built.schema["properties"]
     assert "saju_insight" in built.schema["properties"]
     assert "clear_solution" in built.schema["properties"]
-    assert "re_engagement_hook" in built.schema["properties"]
-    assert "luck_recipe" in built.schema["properties"]
-    assert "answer_signal_summary" in built.schema["properties"]
+    assert "secret_talent" in built.schema["properties"]
+    assert "period_guidance" in built.schema["properties"]
+    assert "share_card" in built.schema["properties"]
+    share_card_properties = built.schema["$defs"]["ShareCard"]["properties"]
+    assert "strengths" in share_card_properties
+    assert share_card_properties["strengths"]["minItems"] == 2
+    assert share_card_properties["strengths"]["maxItems"] == 3
+    assert "situation_mirror" not in built.schema["properties"]
+    assert "luck_recipe" not in built.schema["properties"]
+    assert "answer_signal_summary" not in built.schema["properties"]
     care_section_properties = built.schema["$defs"]["ReadingCareSection"]["properties"]
     assert "summary" in care_section_properties
     assert "detail" in care_section_properties

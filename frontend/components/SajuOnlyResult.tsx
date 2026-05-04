@@ -451,7 +451,7 @@ function DaewoonCard({ period }: { period: DaewoonPeriod }) {
   const elementKey = period.main_element as ElementKey;
 
   return (
-    <div className="min-w-[230px] rounded-lg border border-stone-200 bg-white p-4 shadow-[0_10px_30px_rgba(83,64,42,0.05)]">
+    <div className="min-w-0 rounded-lg border border-stone-200 bg-white p-4 shadow-[0_10px_30px_rgba(83,64,42,0.05)]">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-black text-stone-500">
@@ -480,7 +480,7 @@ function DaewoonSection({ saju }: { saju: SajuData }) {
         title="10년 단위로 들어오는 큰 환경의 변화를 봅니다."
         description="현재 계산은 10세 단위 참고값이며, 절기 차이까지 보정하면 시작 나이가 달라질 수 있습니다."
       />
-      <div className="grid grid-flow-col auto-cols-[minmax(230px,1fr)] gap-3 overflow-x-auto pb-1 lg:grid-flow-row lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {saju.daewoon.map((period) => (
           <DaewoonCard key={`${period.order}-${period.pillar}`} period={period} />
         ))}

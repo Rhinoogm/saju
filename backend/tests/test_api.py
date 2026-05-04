@@ -95,12 +95,7 @@ def target_question_id_from_prompt(prompt: str) -> str:
 FINAL_PAYLOAD = {
     "reading_title": "전환 앞에 선 마음의 나침반",
     "core_message": "이직은 서두르지 말고, 성장 조건이 맞을 때 움직이는 쪽이 맞습니다.",
-    "situation_mirror": {
-        "title": "지금 마음이 향하는 곳",
-        "headline": "성장 욕구와 안정 확인이 동시에 켜져 있습니다.",
-        "summary": "지금의 고민은 단순히 떠나고 싶은 마음보다, 내 능력이 쓰일 조건을 확인하려는 흐름에 가깝습니다.",
-        "detail": "새로운 일을 찾아보고 싶다는 답은 지금의 자리를 단순히 벗어나고 싶은 충동만은 아닙니다. 이력서를 다듬고 공고를 살피는 선택에는 가능성을 현실로 확인하려는 태도가 담겨 있습니다. 특히 안정적인 보상, 배우는 재미, 회복할 수 있는 리듬을 함께 고른 흐름은 성장과 안전을 동시에 요구한다는 신호입니다. 그래서 지금 마음은 무작정 뛰쳐나가려는 쪽보다, 내 능력이 온전히 쓰이고 오래 버틸 수 있는 조건을 찾는 쪽에 가깝습니다. 이 지점을 인정해야 불안이 줄고, 다음 선택을 비교할 기준이 선명해집니다.",
-    },
+    "desired_answer": "당신이 확인받고 싶었던 답은 움직여도 된다는 허락입니다. 다만 명식의 성장 욕구와 안정 기준을 함께 써야 좋은 자리로 이어집니다.",
     "saju_insight": {
         "title": "이 고민이 찾아온 이유",
         "headline": "자라려는 힘과 현실을 재는 힘이 동시에 움직입니다.",
@@ -113,35 +108,39 @@ FINAL_PAYLOAD = {
         "summary": "지금은 퇴사 결정보다 선택지를 꺼내 놓고, 조건표로 움직일 기준을 세울 때입니다.",
         "detail": "지금 해야 할 일은 회사를 박차고 나가는 게 아니라 선택지를 실제로 꺼내 놓는 것입니다. 성장 가능성, 보상, 회복 리듬을 표로 나누고 세 조건 중 두 개 이상 맞는 곳만 진지하게 보세요. 지원을 시작하는 것은 좋지만, 면접 과정에서 들뜬 감정만으로 현재 자리를 끊어내면 판단의 폭이 좁아집니다. 제안이 오기 전까지는 현재 자리를 협상 카드로 남겨두는 쪽이 훨씬 유리합니다. 이번 선택은 용기의 문제가 아니라 조건을 숫자와 일정으로 확인하는 문제이니, 이번 주에는 공고 5개를 비교하고 포기할 조건 3개부터 적는 것이 가장 현실적인 첫 행동입니다.",
     },
-    "saju_vibe": {
-        "title": "타고난 결",
-        "headline": "차가운 흙 위에서 방향을 고르는 단단한 새싹 같은 사람",
-        "summary": "당신의 매력은 빠른 변화보다, 방향을 정한 뒤 꾸준히 뿌리내리는 힘에 있습니다.",
-        "detail": "당신의 매력은 급하게 피어나는 화려함보다, 방향을 정하면 꾸준히 뿌리내리는 힘에 있습니다. 차가운 흙 위에서 천천히 뻗는 새싹처럼, 처음에는 조심스러워 보여도 기준이 잡히면 쉽게 흔들리지 않습니다. 납득되는 기준을 찾을 때 표정과 말의 결이 가장 선명해지고, 주변에서도 그 차분함을 신뢰하게 됩니다. 그래서 당신에게 필요한 환경은 계속 속도를 재촉하는 곳보다, 준비한 만큼 결과를 쌓을 수 있는 곳입니다. 스스로의 리듬을 느리다고 몰아붙이지 말고, 오래 가는 힘으로 다루는 쪽이 훨씬 잘 맞습니다.",
-    },
     "secret_talent": {
         "title": "강점으로 바뀌는 지점",
         "headline": "망설임은 사실 리스크를 먼저 보는 기획력입니다.",
         "summary": "지금의 망설임은 우유부단함보다 리스크를 먼저 보는 기획력에 가깝습니다.",
         "detail": "스스로는 우유부단하다고 느낄 수 있지만, 지금의 망설임은 중요한 선택을 대충 넘기지 않는 감각입니다. 남들이 보기에는 결정을 미루는 것처럼 보여도, 실제로는 손해 볼 지점과 오래 버티기 어려운 조건을 먼저 감지하고 있습니다. 이 힘을 머릿속 걱정으로만 두면 불안이 커지지만, 조건표와 일정으로 바꾸면 다음 선택을 설득력 있게 만드는 무기가 됩니다. 특히 이직처럼 돈, 성장, 체력, 관계가 한꺼번에 걸린 문제에서는 이런 점검 능력이 큰 장점입니다. 단, 검토만 반복하면 기회가 흐려지니 마감일을 정해 판단을 행동으로 옮기는 장치가 필요합니다.",
     },
-    "answer_signals": ["조건 개선 욕구", "인정 욕구", "안전 확인 욕구"],
-    "answer_signal_summary": "조건 개선 욕구와 인정 욕구, 안전 확인 욕구가 함께 보여서, 지금은 무작정 변화를 택하기보다 납득되는 기준을 확인해야 마음이 놓이는 흐름입니다.",
     "saju_basis": ["월주 흐름에서 환경 변화 압박이 보입니다.", "오행 균형상 표현 욕구가 막히면 답답함이 커집니다.", "대운 흐름은 준비된 이동에 유리합니다."],
-    "timing_points": [
-        "앞으로 2주는 마음을 다그치기보다 조건표를 만드세요. 기준을 중시하는 명식 흐름이 정리될수록 힘을 얻습니다.",
-        "한 달 안에는 지원할 역할과 포기할 조건을 나누세요. 성장 욕구와 안정 확인이 함께 움직이는 타입이라 기준이 필요합니다.",
-        "1-3개월 사이에는 실제 제안과 현재 자리의 회복 가능성을 비교하세요. 대운 흐름은 준비된 이동에 더 힘을 실어줍니다.",
+    "period_guidance": [
+        {
+            "label": "기준을 세우는 흐름",
+            "saju_feature": "월주 흐름의 현실 감각이 먼저 살아나는 구간입니다.",
+            "good": "조건을 숫자와 역할로 나누면 막연한 불안이 줄고 선택지가 선명해집니다.",
+            "caution": "감정만 앞세워 현재 자리를 끊어내면 비교할 기준을 잃기 쉽습니다.",
+        },
+        {
+            "label": "기회가 넓어지는 흐름",
+            "saju_feature": "표현 욕구와 성장 기운이 밖으로 드러나기 쉬운 구간입니다.",
+            "good": "준비한 이력과 강점을 보여주면 새로운 제안이나 역할 탐색이 자연스럽게 열립니다.",
+            "caution": "좋아 보이는 말에만 반응하지 말고 보상과 회복 리듬을 반드시 확인해야 합니다.",
+        },
+        {
+            "label": "선택을 굳히는 흐름",
+            "saju_feature": "대운의 이동성이 준비된 결정을 밀어주는 구간입니다.",
+            "good": "현재 자리와 새 제안을 같은 기준으로 비교하면 납득되는 결론에 가까워집니다.",
+            "caution": "완벽한 확신만 기다리면 기회가 흐려지니 포기 조건을 먼저 정해야 합니다.",
+        },
     ],
-    "luck_recipe": [
-        {"category": "컬러", "item": "딥 민트", "reason": "표현 욕구가 쉽게 달아오르는 흐름이라 차분한 색이 기준을 세우는 감각을 돕습니다."},
-        {"category": "음식", "item": "따뜻한 보리차", "reason": "생각이 몸보다 앞서기 쉬운 결이라 따뜻한 차가 속도를 낮추고 긴장을 풀어줍니다."},
-        {"category": "작은 습관", "item": "퇴근 후 10분 조건표 쓰기", "reason": "안정 확인이 중요한 명식이라 걱정을 눈에 보이는 선택 기준으로 바꾸는 일이 필요합니다."},
-        {"category": "아이템", "item": "작은 체크 노트", "reason": "현실 조건을 따지는 힘이 강하니 계산을 밖으로 꺼낼수록 확신이 쌓입니다."},
-    ],
-    "re_engagement_hook": {
-        "title": "다음엔 이런 것도 궁금해질 거예요",
-        "body": "명식을 보면 일에서 인정받는 방식만큼 재물 흐름을 관리하는 방식도 꽤 흥미롭습니다. 다음에는 연봉 협상이나 금전운을 열어보면 선택 기준이 더 또렷해질 수 있습니다.",
+    "share_card": {
+        "core_saju_feature": "성장 욕구와 현실 기준을 함께 쓰는 명식 흐름",
+        "balancing_need": "급한 결정보다 기준을 밖으로 꺼내는 금의 기운",
+        "daily_element": "작은 체크 노트",
+        "daily_reason": "생각을 적어 조건으로 바꾸면 흔들리는 마음이 실제 선택 기준으로 정리됩니다.",
+        "strengths": ["기준 정리", "성장 감각", "현실 판단"],
     },
     "caution": "이 리딩은 확정 예언이 아니라 자기 이해와 선택을 돕는 참고 자료입니다.",
 }
@@ -247,7 +246,7 @@ class AlwaysInvalidFinalReadingProvider:
         max_output_tokens: int | None = None,
     ) -> LLMResponse:
         self.calls += 1
-        return LLMResponse(content='{"reading_title":"끊긴 응답","situation_mirror":{"title":"중간에서', model="test-model", provider="mock")
+        return LLMResponse(content='{"reading_title":"끊긴 응답","desired_answer":"중간에서', model="test-model", provider="mock")
 
 
 class SchemaInvalidFinalReadingProvider:
@@ -260,7 +259,7 @@ class SchemaInvalidFinalReadingProvider:
         schema_name: str,
         max_output_tokens: int | None = None,
     ) -> LLMResponse:
-        payload = {**FINAL_PAYLOAD, "luck_recipe": FINAL_PAYLOAD["luck_recipe"][:2]}
+        payload = {**FINAL_PAYLOAD, "period_guidance": FINAL_PAYLOAD["period_guidance"][:2]}
         return LLMResponse(content=json.dumps(payload, ensure_ascii=False), model="test-model", provider="mock")
 
 
@@ -546,6 +545,13 @@ def test_default_final_prompt_keeps_personas_and_removes_redundant_internal_goal
     assert "싸가지 없는 천재 명리학자" in FINAL_SYSTEM_PROMPT_DIRECT
     assert "고객 리텐션" not in FINAL_USER_PROMPT_TEMPLATE
     assert "field_source_mapping" in FINAL_USER_PROMPT_TEMPLATE
+    assert "고객이 진짜 듣고 싶었던 말" in FINAL_USER_PROMPT_TEMPLATE
+    assert "desired_answer" in FINAL_USER_PROMPT_TEMPLATE
+    assert "period_guidance" in FINAL_USER_PROMPT_TEMPLATE
+    assert "share_card" in FINAL_USER_PROMPT_TEMPLATE
+    assert "strengths" in FINAL_USER_PROMPT_TEMPLATE
+    assert "작은 체크 노트" in FINAL_USER_PROMPT_TEMPLATE
+    assert "luck_recipe" not in FINAL_USER_PROMPT_TEMPLATE
     assert FINAL_USER_PROMPT_TEMPLATE.count("JSON Schema") == 1
 
 
@@ -659,20 +665,21 @@ def test_final_reading_happy_path() -> None:
     body = response.json()
     assert body["reading"]["core_message"].startswith("이직은")
     assert body["reading"]["reading_title"] == "전환 앞에 선 마음의 나침반"
-    assert body["reading"]["situation_mirror"]["title"] == "지금 마음이 향하는 곳"
+    assert "움직여도 된다는 허락" in body["reading"]["desired_answer"]
     assert body["reading"]["saju_insight"]["title"] == "이 고민이 찾아온 이유"
     assert body["reading"]["clear_solution"]["title"] == "지금 필요한 선택"
-    assert body["reading"]["saju_vibe"]["title"] == "타고난 결"
     assert body["reading"]["secret_talent"]["title"] == "강점으로 바뀌는 지점"
-    assert body["reading"]["re_engagement_hook"]["title"] == "다음엔 이런 것도 궁금해질 거예요"
-    assert "조건을 확인하려는 흐름" in body["reading"]["situation_mirror"]["summary"]
-    assert "이력서를 다듬고 공고를 살피는 선택" in body["reading"]["situation_mirror"]["detail"]
-    assert "body" not in body["reading"]["situation_mirror"]
-    assert body["reading"]["re_engagement_hook"]["body"].startswith("명식을 보면")
-    assert "조건 개선 욕구" in body["reading"]["answer_signal_summary"]
-    assert len(body["reading"]["luck_recipe"]) == 4
+    assert "situation_mirror" not in body["reading"]
+    assert "saju_vibe" not in body["reading"]
+    assert "answer_signals" not in body["reading"]
+    assert "answer_signal_summary" not in body["reading"]
+    assert "timing_points" not in body["reading"]
+    assert "luck_recipe" not in body["reading"]
+    assert "re_engagement_hook" not in body["reading"]
     assert len(body["reading"]["saju_basis"]) == 3
-    assert len(body["reading"]["timing_points"]) == 3
+    assert len(body["reading"]["period_guidance"]) == 3
+    assert body["reading"]["share_card"]["daily_element"] == "작은 체크 노트"
+    assert len(body["reading"]["share_card"]["strengths"]) == 3
     assert provider.calls[-1]["max_output_tokens"] == 5000
 
 
@@ -745,7 +752,7 @@ def test_final_reading_reports_schema_validation_details() -> None:
 
     app.dependency_overrides.clear()
     assert response.status_code == 502
-    assert "luck_recipe" in response.json()["detail"]
+    assert "period_guidance" in response.json()["detail"]
 
 
 def test_final_reading_reports_json_syntax_error() -> None:
