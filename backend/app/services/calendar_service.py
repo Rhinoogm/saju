@@ -1,19 +1,25 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sajupy import calculate_saju, lunar_to_solar, solar_to_lunar
 
-from app.schemas.saju import InitialProfile, SajuData
+from app.schemas.saju import CurrentLuck, InitialProfile, SajuData
 from app.services.saju_features import (
     BRANCHES,
     STEMS,
+    build_time_luck_pillar,
     build_daewoon,
     calculation_note,
     count_elements,
+    dominant_ten_god as select_dominant_ten_god,
     enrich_pillars,
     flatten_ten_gods,
+    score_ten_gods,
 )
+from app.services.yonghuishin import analyze_yonghuishin
 
 
 class CalendarCalculationError(ValueError):
@@ -35,6 +41,9 @@ class CalendarService:
 
         pillars = enrich_pillars(raw_saju)
         day_master = raw_saju["day_stem"]
+        ten_gods = flatten_ten_gods(pillars)
+        ten_god_scores = score_ten_gods(ten_gods)
+        yonghuishin = analyze_yonghuishin(pillars, day_master)
 
         return SajuData(
             solar_date=f"{solar_birth['year']:04d}-{solar_birth['month']:02d}-{solar_birth['day']:02d}",
@@ -44,8 +53,12 @@ class CalendarService:
             day_master=day_master,
             day_master_element=STEMS[day_master]["element"],
             elements_count=count_elements(pillars),
-            ten_gods=flatten_ten_gods(pillars),
+            ten_gods=ten_gods,
+            ten_god_scores=ten_god_scores,
+            dominant_ten_god=ten_god_scores[0] if ten_god_scores else select_dominant_ten_god(ten_gods),
             daewoon=build_daewoon(raw_saju, request.gender),
+            current_luck=self._build_current_luck(day_master),
+            yonghuishin=yonghuishin,
             calculation_note=calculation_note(request.gender),
             raw=_json_safe(raw_saju),
         )
@@ -86,6 +99,55 @@ class CalendarService:
                 kwargs["city"] = birth.city or "Seoul"
 
         return calculate_saju(**kwargs)
+
+    def _build_current_luck(self, day_master: str, reference_date: date | None = None) -> CurrentLuck:
+        reference = reference_date or datetime.now(ZoneInfo("Asia/Seoul")).date()
+        next_year, next_month = _next_month(reference.year, reference.month)
+        next_month_date = date(next_year, next_month, 15)
+
+        annual_raw = _calculate_reference_saju(reference)
+        next_month_raw = _calculate_reference_saju(next_month_date)
+
+        return CurrentLuck(
+            reference_date=reference.isoformat(),
+            annual=build_time_luck_pillar(
+                annual_raw,
+                key="year",
+                day_master=day_master,
+                label=f"{reference.year}년 세운",
+                year=reference.year,
+                month=None,
+                representative_date=reference.isoformat(),
+            ),
+            next_month=build_time_luck_pillar(
+                next_month_raw,
+                key="month",
+                day_master=day_master,
+                label=f"{next_year}년 {next_month}월 월운",
+                year=next_year,
+                month=next_month,
+                representative_date=next_month_date.isoformat(),
+            ),
+        )
+
+
+def _next_month(year: int, month: int) -> tuple[int, int]:
+    if month == 12:
+        return year + 1, 1
+    return year, month + 1
+
+
+def _calculate_reference_saju(target_date: date) -> dict[str, Any]:
+    return calculate_saju(
+        year=target_date.year,
+        month=target_date.month,
+        day=target_date.day,
+        hour=12,
+        minute=0,
+        use_solar_time=False,
+        utc_offset=9,
+        early_zi_time=True,
+    )
 
 
 def _json_safe(value: Any) -> Any:

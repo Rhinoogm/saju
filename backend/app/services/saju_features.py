@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from app.schemas.saju import DaewoonPeriod, Gender, PillarDetail
+from app.schemas.saju import DaewoonPeriod, Gender, PillarDetail, TenGodScore, TimeLuckPillar
 
 
 ELEMENTS = ("wood", "fire", "earth", "metal", "water")
@@ -56,6 +56,21 @@ PILLAR_CYCLE = [
     STEM_SEQUENCE[i % len(STEM_SEQUENCE)] + BRANCH_SEQUENCE[i % len(BRANCH_SEQUENCE)]
     for i in range(60)
 ]
+
+TEN_GOD_SCORE_WEIGHTS = {
+    "year_stem": 0.8,
+    "year_branch": 0.8,
+    "month_stem": 1.0,
+    "month_branch": 1.6,
+    "day_branch": 1.0,
+    "hour_stem": 0.8,
+    "hour_branch": 0.8,
+}
+
+TEN_GOD_PRIORITY = {
+    name: index
+    for index, name in enumerate(("비견", "겁재", "식신", "상관", "편재", "정재", "편관", "정관", "편인", "정인"))
+}
 
 
 @dataclass(frozen=True)
@@ -134,6 +149,69 @@ def flatten_ten_gods(pillars: dict[str, PillarDetail]) -> dict[str, str]:
         f"{key}_branch": value.branch_ten_god or ""
         for key, value in pillars.items()
     }
+
+
+def score_ten_gods(ten_gods: dict[str, str]) -> list[TenGodScore]:
+    scores: dict[str, float] = {}
+    counts: dict[str, int] = {}
+    positions: dict[str, list[str]] = {}
+
+    for position, name in ten_gods.items():
+        if not name or name == "일간":
+            continue
+        weight = TEN_GOD_SCORE_WEIGHTS.get(position)
+        if weight is None:
+            continue
+        scores[name] = scores.get(name, 0.0) + weight
+        counts[name] = counts.get(name, 0) + 1
+        positions.setdefault(name, []).append(position)
+
+    ranked = sorted(
+        scores,
+        key=lambda name: (-scores[name], -counts[name], TEN_GOD_PRIORITY.get(name, len(TEN_GOD_PRIORITY)), name),
+    )
+    return [
+        TenGodScore(name=name, score=round(scores[name], 3), count=counts[name], positions=positions[name])
+        for name in ranked
+    ]
+
+
+def dominant_ten_god(ten_gods: dict[str, str]) -> TenGodScore:
+    scores = score_ten_gods(ten_gods)
+    if scores:
+        return scores[0]
+    return TenGodScore(name="일간", score=0.0, count=1, positions=["day_stem"])
+
+
+def build_time_luck_pillar(
+    raw_saju: dict[str, Any],
+    *,
+    key: str,
+    day_master: str,
+    label: str,
+    year: int,
+    month: int | None,
+    representative_date: str,
+) -> TimeLuckPillar:
+    stem = raw_saju[f"{key}_stem"]
+    branch = raw_saju[f"{key}_branch"]
+    stem_info = _stem_info(stem)
+    branch_info = _branch_info(branch)
+    return TimeLuckPillar(
+        label=label,
+        year=year,
+        month=month,
+        representative_date=representative_date,
+        pillar=raw_saju[f"{key}_pillar"],
+        stem=stem,
+        branch=branch,
+        stem_element=stem_info.element,
+        branch_element=branch_info.element,
+        stem_yin_yang=stem_info.yin_yang,  # type: ignore[arg-type]
+        branch_yin_yang=branch_info.yin_yang,  # type: ignore[arg-type]
+        stem_ten_god=ten_god(day_master, stem),
+        branch_ten_god=ten_god(day_master, branch),
+    )
 
 
 def daewoon_direction(gender: Gender, year_stem: str) -> int:

@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 OptionId = Annotated[str, Field(pattern="^[A-D]$")]
-ShareStrength = Annotated[str, Field(min_length=2, max_length=24)]
 OPTION_MARKER_RE = re.compile(r"\s*(?:\([A-D]\)|[A-D][.)]|[①②③④])\s*")
 
 
@@ -87,6 +86,121 @@ class DaewoonPeriod(BaseModel):
     main_element: str
 
 
+class TimeLuckPillar(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    year: int
+    month: int | None = None
+    representative_date: str
+    pillar: str
+    stem: str
+    branch: str
+    stem_element: str
+    branch_element: str
+    stem_yin_yang: Literal["yang", "yin"]
+    branch_yin_yang: Literal["yang", "yin"]
+    stem_ten_god: str
+    branch_ten_god: str
+
+
+class CurrentLuck(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reference_date: str
+    annual: TimeLuckPillar
+    next_month: TimeLuckPillar
+
+
+class TenGodScore(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    score: float
+    count: int
+    positions: list[str] = Field(default_factory=list, max_length=8)
+
+
+class YonghuishinCandidate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    element: str
+    score: float | None = None
+    reason: str
+
+
+class GeokgukYongshinCandidate(YonghuishinCandidate):
+    ten_god: str | None = None
+    stem: str | None = None
+
+
+class DayMasterStrength(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    support_score: float
+    drain_score: float
+    strength_index: float
+    label: str
+    evidence: list[str] = Field(..., min_length=1, max_length=5)
+
+
+class GeokgukMonthSource(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    month_branch: str
+    selected_hidden_stem: str
+    ten_god: str
+    transmitted: bool
+
+
+class GeokgukAnalysis(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    selected_from_month: GeokgukMonthSource
+    confidence: float
+    damage: list[str] = Field(default_factory=list, max_length=5)
+
+
+class SpecialGeokCandidate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    confidence: float
+    reason: str
+
+
+class YongshinAnalysis(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    eokbu_yongshin: list[YonghuishinCandidate] = Field(default_factory=list)
+    geokguk_yongshin: list[GeokgukYongshinCandidate] = Field(default_factory=list)
+    johwu_yongshin: list[YonghuishinCandidate] = Field(default_factory=list)
+    final_yongshin: list[YonghuishinCandidate] = Field(..., min_length=1, max_length=2)
+    huishin: list[YonghuishinCandidate] = Field(..., min_length=1, max_length=2)
+    gishin: list[YonghuishinCandidate] = Field(..., min_length=1, max_length=2)
+
+
+class YonghuishinInterpretation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str
+    strength_reading: str
+    geokguk_reading: str
+    yongshin_reading: str
+
+
+class YonghuishinAnalysis(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    element_power: dict[str, float]
+    strength: DayMasterStrength
+    geokguk: GeokgukAnalysis
+    special_geok_candidates: list[SpecialGeokCandidate] = Field(default_factory=list, max_length=3)
+    yongshin: YongshinAnalysis
+    interpretation: YonghuishinInterpretation
+
+
 class SajuData(BaseModel):
     solar_date: str
     lunar_date: dict[str, Any]
@@ -96,7 +210,11 @@ class SajuData(BaseModel):
     day_master_element: str
     elements_count: dict[str, int]
     ten_gods: dict[str, str]
+    ten_god_scores: list[TenGodScore]
+    dominant_ten_god: TenGodScore
     daewoon: list[DaewoonPeriod]
+    current_luck: CurrentLuck
+    yonghuishin: YonghuishinAnalysis
     calculation_note: str
     raw: dict[str, Any]
 
@@ -212,46 +330,67 @@ class FinalReadingRequest(InitialProfile):
         return self
 
 
-class ReadingCareSection(BaseModel):
+class CompassSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    title: str = Field(..., min_length=2, max_length=36)
-    headline: str = Field(..., min_length=4, max_length=100)
-    summary: str = Field(..., min_length=20, max_length=220)
-    detail: str = Field(..., min_length=200, max_length=1200)
+    headline: str = Field(..., min_length=8, max_length=90)
+    basis: str = Field(..., min_length=40, max_length=260)
+    solution: str = Field(..., min_length=40, max_length=280)
+    strength_animal: str = Field(..., min_length=8, max_length=90)
 
 
-class PeriodGuidanceItem(BaseModel):
+class ManseSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    label: str = Field(..., min_length=2, max_length=36)
-    saju_feature: str = Field(..., min_length=10, max_length=180)
-    good: str = Field(..., min_length=20, max_length=260)
-    caution: str = Field(..., min_length=20, max_length=260)
+    headline: str = Field(..., min_length=8, max_length=90)
+    energy_overview: str = Field(..., min_length=40, max_length=240)
+    key_traits: list[str] = Field(..., min_length=3, max_length=4)
 
 
-class ShareCard(BaseModel):
+class DualReadingSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    core_saju_feature: str = Field(..., min_length=10, max_length=160)
-    balancing_need: str = Field(..., min_length=8, max_length=120)
-    daily_element: str = Field(..., min_length=1, max_length=50)
-    daily_reason: str = Field(..., min_length=10, max_length=180)
-    strengths: list[ShareStrength] = Field(..., min_length=2, max_length=3)
+    title: str = Field(..., min_length=4, max_length=44)
+    headline: str = Field(..., min_length=8, max_length=100)
+    body: str = Field(..., min_length=80, max_length=520)
+
+
+class DualReading(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    weapon: DualReadingSection
+    growth_hint: DualReadingSection
+
+
+class HealingCard(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    metaphor_sentence: str = Field(..., min_length=8, max_length=70)
+    affirmation: str = Field(..., min_length=8, max_length=90)
+    lucky_element: str = Field(..., min_length=1, max_length=20)
+    color: str = Field(..., min_length=2, max_length=40)
+    direction: str = Field(..., min_length=1, max_length=20)
+    ritual: str = Field(..., min_length=20, max_length=180)
+    interpretation: str = Field(..., min_length=60, max_length=360)
+
+
+class SecretDoor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    unexplored_area: str = Field(..., min_length=2, max_length=40)
+    next_month_signal: str = Field(..., min_length=20, max_length=180)
+    teaser: str = Field(..., min_length=50, max_length=320)
 
 
 class FinalReadingOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     reading_title: str = Field(..., min_length=4, max_length=80)
-    core_message: str = Field(..., min_length=8, max_length=160)
-    desired_answer: str = Field(..., min_length=20, max_length=260)
-    saju_insight: ReadingCareSection
-    clear_solution: ReadingCareSection
-    secret_talent: ReadingCareSection
-    saju_basis: list[str] = Field(..., min_length=3, max_length=5)
-    period_guidance: list[PeriodGuidanceItem] = Field(..., min_length=3, max_length=3)
-    share_card: ShareCard
+    compass_summary: CompassSummary
+    manse_summary: ManseSummary
+    dual_reading: DualReading
+    healing_card: HealingCard
+    secret_door: SecretDoor
     caution: str = Field(..., min_length=8, max_length=240)
 
 

@@ -94,53 +94,42 @@ def target_question_id_from_prompt(prompt: str) -> str:
 
 FINAL_PAYLOAD = {
     "reading_title": "전환 앞에 선 마음의 나침반",
-    "core_message": "이직은 서두르지 말고, 성장 조건이 맞을 때 움직이는 쪽이 맞습니다.",
-    "desired_answer": "당신이 확인받고 싶었던 답은 움직여도 된다는 허락입니다. 다만 명식의 성장 욕구와 안정 기준을 함께 써야 좋은 자리로 이어집니다.",
-    "saju_insight": {
-        "title": "이 고민이 찾아온 이유",
-        "headline": "자라려는 힘과 현실을 재는 힘이 동시에 움직입니다.",
-        "summary": "명식에는 성장할 자리와 감당할 조건을 동시에 재려는 움직임이 함께 보입니다.",
-        "detail": "명식에는 더 넓은 역할을 탐색하려는 흐름과 안정된 기준을 확인하려는 흐름이 함께 보입니다. 그래서 지금의 고민은 변덕이 아니라, 성장할 자리와 감당할 조건을 동시에 재는 과정입니다. 대운의 흐름도 준비된 이동에는 힘을 실어주지만, 감정만 앞선 선택에는 부담을 남깁니다. 지금 중요한 것은 변화 자체가 좋은지 나쁜지를 빨리 결론내는 일이 아니라, 어떤 환경에서 능력이 살아나고 어떤 조건에서 지치는지를 분리해서 보는 일입니다. 이 구분이 생기면 막연한 불안은 줄고, 실제 제안이 왔을 때 흔들리지 않는 판단 기준이 됩니다.",
+    "compass_summary": {
+        "headline": "성장을 여는 목(木)의 기운이 이직 고민을 비교 가능한 선택으로 바꿔 줍니다.",
+        "basis": "갑목(甲木, 곧게 자라려는 나의 중심)에 올해 병오(丙午, 드러내고 움직이는 흐름) 세운이 닿으면서, 지금의 이동 고민은 자연스럽게 커진 성장 신호입니다.",
+        "solution": "용신인 목(木, 새 방향을 틔우는 기운)을 살리려면 오늘은 감정보다 작은 탐색이 필요합니다. 지원할 공고 세 개를 고르고, 포기할 조건 하나를 먼저 적어보세요.",
+        "strength_animal": "숲길을 먼저 살피는 사슴처럼, 신중함으로 새 길을 고르는 힘",
     },
-    "clear_solution": {
-        "title": "지금 필요한 선택",
-        "headline": "지원은 시작하되, 퇴사는 제안서와 조건표가 나온 뒤입니다.",
-        "summary": "지금은 퇴사 결정보다 선택지를 꺼내 놓고, 조건표로 움직일 기준을 세울 때입니다.",
-        "detail": "지금 해야 할 일은 회사를 박차고 나가는 게 아니라 선택지를 실제로 꺼내 놓는 것입니다. 성장 가능성, 보상, 회복 리듬을 표로 나누고 세 조건 중 두 개 이상 맞는 곳만 진지하게 보세요. 지원을 시작하는 것은 좋지만, 면접 과정에서 들뜬 감정만으로 현재 자리를 끊어내면 판단의 폭이 좁아집니다. 제안이 오기 전까지는 현재 자리를 협상 카드로 남겨두는 쪽이 훨씬 유리합니다. 이번 선택은 용기의 문제가 아니라 조건을 숫자와 일정으로 확인하는 문제이니, 이번 주에는 공고 5개를 비교하고 포기할 조건 3개부터 적는 것이 가장 현실적인 첫 행동입니다.",
+    "manse_summary": {
+        "headline": "기운은 성장 욕구와 현실 점검이 함께 강합니다.",
+        "energy_overview": "오행 분포에서는 목과 수가 눈에 띄고, 주무기 십성은 비견으로 잡힙니다. 스스로 기준을 세우려는 힘이 올해 세운과 만나 선택 압박으로 드러납니다.",
+        "key_traits": ["일간 甲의 성장성", "주무기 비견의 자기 기준", "세운 丙午의 표현 압력"],
     },
-    "secret_talent": {
-        "title": "강점으로 바뀌는 지점",
-        "headline": "망설임은 사실 리스크를 먼저 보는 기획력입니다.",
-        "summary": "지금의 망설임은 우유부단함보다 리스크를 먼저 보는 기획력에 가깝습니다.",
-        "detail": "스스로는 우유부단하다고 느낄 수 있지만, 지금의 망설임은 중요한 선택을 대충 넘기지 않는 감각입니다. 남들이 보기에는 결정을 미루는 것처럼 보여도, 실제로는 손해 볼 지점과 오래 버티기 어려운 조건을 먼저 감지하고 있습니다. 이 힘을 머릿속 걱정으로만 두면 불안이 커지지만, 조건표와 일정으로 바꾸면 다음 선택을 설득력 있게 만드는 무기가 됩니다. 특히 이직처럼 돈, 성장, 체력, 관계가 한꺼번에 걸린 문제에서는 이런 점검 능력이 큰 장점입니다. 단, 검토만 반복하면 기회가 흐려지니 마감일을 정해 판단을 행동으로 옮기는 장치가 필요합니다.",
+    "dual_reading": {
+        "weapon": {
+            "title": "나의 무기",
+            "headline": "비견의 자기 기준은 흔들리는 선택을 붙잡는 힘입니다.",
+            "body": "홍길동님에게 강하게 잡히는 비견은 남의 말에 쉽게 휘둘리기보다 자기 기준을 세우는 힘입니다. 지금 상황이 복잡해 보여도, 이 힘은 조건을 비교하고 버틸 수 있는 중심이 됩니다. 이직 고민에서는 감정적 도피보다 내가 납득할 수 있는 기준표를 만드는 능력으로 쓰일 때 가장 강합니다.",
+        },
+        "growth_hint": {
+            "title": "성장의 힌트",
+            "headline": "기준이 강해질수록 혼자 버티려는 부담도 커질 수 있습니다.",
+            "body": "다만 비견의 장점이 과해지면 모든 판단을 혼자 책임지려는 무게가 커질 수 있습니다. 기신으로 잡히는 금의 서늘한 압박이 강해질 때는 스스로를 몰아붙이는 방식으로 고민이 깊어집니다. 이럴 때는 희신인 수의 유연함을 빌려, 결론을 당장 내리기보다 정보를 천천히 흘려보내며 선택지를 넓히는 쪽이 좋습니다.",
+        },
     },
-    "saju_basis": ["월주 흐름에서 환경 변화 압박이 보입니다.", "오행 균형상 표현 욕구가 막히면 답답함이 커집니다.", "대운 흐름은 준비된 이동에 유리합니다."],
-    "period_guidance": [
-        {
-            "label": "기준을 세우는 흐름",
-            "saju_feature": "월주 흐름의 현실 감각이 먼저 살아나는 구간입니다.",
-            "good": "조건을 숫자와 역할로 나누면 막연한 불안이 줄고 선택지가 선명해집니다.",
-            "caution": "감정만 앞세워 현재 자리를 끊어내면 비교할 기준을 잃기 쉽습니다.",
-        },
-        {
-            "label": "기회가 넓어지는 흐름",
-            "saju_feature": "표현 욕구와 성장 기운이 밖으로 드러나기 쉬운 구간입니다.",
-            "good": "준비한 이력과 강점을 보여주면 새로운 제안이나 역할 탐색이 자연스럽게 열립니다.",
-            "caution": "좋아 보이는 말에만 반응하지 말고 보상과 회복 리듬을 반드시 확인해야 합니다.",
-        },
-        {
-            "label": "선택을 굳히는 흐름",
-            "saju_feature": "대운의 이동성이 준비된 결정을 밀어주는 구간입니다.",
-            "good": "현재 자리와 새 제안을 같은 기준으로 비교하면 납득되는 결론에 가까워집니다.",
-            "caution": "완벽한 확신만 기다리면 기회가 흐려지니 포기 조건을 먼저 정해야 합니다.",
-        },
-    ],
-    "share_card": {
-        "core_saju_feature": "성장 욕구와 현실 기준을 함께 쓰는 명식 흐름",
-        "balancing_need": "급한 결정보다 기준을 밖으로 꺼내는 금의 기운",
-        "daily_element": "작은 체크 노트",
-        "daily_reason": "생각을 적어 조건으로 바꾸면 흔들리는 마음이 실제 선택 기준으로 정리됩니다.",
-        "strengths": ["기준 정리", "성장 감각", "현실 판단"],
+    "healing_card": {
+        "metaphor_sentence": "새벽 공기를 밀고 올라오는 곧은 나무의 첫 숨",
+        "affirmation": "내 선택은 천천히 자라도 충분히 힘이 있습니다.",
+        "lucky_element": "목",
+        "color": "그린/블루",
+        "direction": "동쪽",
+        "ritual": "아침 5분 동안 창가에서 낯선 음악 한 곡을 들으며 오늘 열어볼 선택지 하나를 떠올려보세요.",
+        "interpretation": "이 카드는 홍길동님에게 필요한 목의 기운을 담았습니다. 그린과 블루는 굳은 마음에 새 방향을 열어주고, 동쪽을 향하는 작은 루틴은 멈춘 생각을 다시 자라게 하는 상징으로 작동합니다.",
+    },
+    "secret_door": {
+        "unexplored_area": "관계와 협업의 다음 문",
+        "next_month_signal": "다가오는 6월 월운에서는 비견과 식신의 흐름이 함께 보입니다.",
+        "teaser": "이번 리포트에서는 이직 고민을 중심으로 보았지만, 다음 달에는 사람들과 함께 움직일 때 열리는 기회가 더 선명해질 수 있습니다. 지금의 고민을 정리한 뒤, 관계와 협업의 흐름을 따로 보면 선택의 폭이 더 넓어집니다.",
     },
     "caution": "이 리딩은 확정 예언이 아니라 자기 이해와 선택을 돕는 참고 자료입니다.",
 }
@@ -246,7 +235,7 @@ class AlwaysInvalidFinalReadingProvider:
         max_output_tokens: int | None = None,
     ) -> LLMResponse:
         self.calls += 1
-        return LLMResponse(content='{"reading_title":"끊긴 응답","desired_answer":"중간에서', model="test-model", provider="mock")
+        return LLMResponse(content='{"reading_title":"끊긴 응답","compass_summary":{"headline":"중간에서', model="test-model", provider="mock")
 
 
 class SchemaInvalidFinalReadingProvider:
@@ -259,7 +248,8 @@ class SchemaInvalidFinalReadingProvider:
         schema_name: str,
         max_output_tokens: int | None = None,
     ) -> LLMResponse:
-        payload = {**FINAL_PAYLOAD, "period_guidance": FINAL_PAYLOAD["period_guidance"][:2]}
+        payload = {**FINAL_PAYLOAD}
+        payload.pop("compass_summary")
         return LLMResponse(content=json.dumps(payload, ensure_ascii=False), model="test-model", provider="mock")
 
 
@@ -544,13 +534,27 @@ def test_default_final_prompt_keeps_personas_and_removes_redundant_internal_goal
     assert "극F 성향의 사주 과몰입 찐 언니" in FINAL_SYSTEM_PROMPT_EMPATHETIC
     assert "싸가지 없는 천재 명리학자" in FINAL_SYSTEM_PROMPT_DIRECT
     assert "고객 리텐션" not in FINAL_USER_PROMPT_TEMPLATE
+    assert "두려워하는 선택 기준" not in FINAL_USER_PROMPT_TEMPLATE
     assert "field_source_mapping" in FINAL_USER_PROMPT_TEMPLATE
     assert "고객이 진짜 듣고 싶었던 말" in FINAL_USER_PROMPT_TEMPLATE
-    assert "desired_answer" in FINAL_USER_PROMPT_TEMPLATE
-    assert "period_guidance" in FINAL_USER_PROMPT_TEMPLATE
-    assert "share_card" in FINAL_USER_PROMPT_TEMPLATE
-    assert "strengths" in FINAL_USER_PROMPT_TEMPLATE
-    assert "작은 체크 노트" in FINAL_USER_PROMPT_TEMPLATE
+    assert "5단계 답변으로 듣고 싶은 말 추론" in FINAL_USER_PROMPT_TEMPLATE
+    assert "긍정적인 작용" in FINAL_USER_PROMPT_TEMPLATE
+    assert "한글(한자)" in FINAL_USER_PROMPT_TEMPLATE
+    assert "쉬운 설명" in FINAL_USER_PROMPT_TEMPLATE
+    assert "첫 카드 섹션 헤드라인" in FINAL_USER_PROMPT_TEMPLATE
+    assert "원국" in FINAL_USER_PROMPT_TEMPLATE
+    assert "용신" in FINAL_USER_PROMPT_TEMPLATE
+    assert "희신" in FINAL_USER_PROMPT_TEMPLATE
+    assert "기신" in FINAL_USER_PROMPT_TEMPLATE
+    assert "오행 균형" in FINAL_USER_PROMPT_TEMPLATE
+    assert "compass_summary" in FINAL_USER_PROMPT_TEMPLATE
+    assert "manse_summary" in FINAL_USER_PROMPT_TEMPLATE
+    assert "dual_reading" in FINAL_USER_PROMPT_TEMPLATE
+    assert "healing_card" in FINAL_USER_PROMPT_TEMPLATE
+    assert "secret_door" in FINAL_USER_PROMPT_TEMPLATE
+    assert "final_yongshin[0]" in FINAL_USER_PROMPT_TEMPLATE
+    assert "업무 체크리스트" in FINAL_USER_PROMPT_TEMPLATE
+    assert "current_luck" in FINAL_USER_PROMPT_TEMPLATE
     assert "luck_recipe" not in FINAL_USER_PROMPT_TEMPLATE
     assert FINAL_USER_PROMPT_TEMPLATE.count("JSON Schema") == 1
 
@@ -663,12 +667,12 @@ def test_final_reading_happy_path() -> None:
     app.dependency_overrides.clear()
     assert response.status_code == 200
     body = response.json()
-    assert body["reading"]["core_message"].startswith("이직은")
+    assert body["reading"]["compass_summary"]["headline"].startswith("성장을 여는 목")
+    assert body["reading"]["compass_summary"]["strength_animal"].startswith("숲길을 먼저 살피는 사슴")
     assert body["reading"]["reading_title"] == "전환 앞에 선 마음의 나침반"
-    assert "움직여도 된다는 허락" in body["reading"]["desired_answer"]
-    assert body["reading"]["saju_insight"]["title"] == "이 고민이 찾아온 이유"
-    assert body["reading"]["clear_solution"]["title"] == "지금 필요한 선택"
-    assert body["reading"]["secret_talent"]["title"] == "강점으로 바뀌는 지점"
+    assert "갑목(甲木" in body["reading"]["compass_summary"]["basis"]
+    assert body["reading"]["dual_reading"]["weapon"]["title"] == "나의 무기"
+    assert body["reading"]["dual_reading"]["growth_hint"]["title"] == "성장의 힌트"
     assert "situation_mirror" not in body["reading"]
     assert "saju_vibe" not in body["reading"]
     assert "answer_signals" not in body["reading"]
@@ -676,10 +680,14 @@ def test_final_reading_happy_path() -> None:
     assert "timing_points" not in body["reading"]
     assert "luck_recipe" not in body["reading"]
     assert "re_engagement_hook" not in body["reading"]
-    assert len(body["reading"]["saju_basis"]) == 3
-    assert len(body["reading"]["period_guidance"]) == 3
-    assert body["reading"]["share_card"]["daily_element"] == "작은 체크 노트"
-    assert len(body["reading"]["share_card"]["strengths"]) == 3
+    assert "saju_basis" not in body["reading"]
+    assert "period_guidance" not in body["reading"]
+    assert body["reading"]["healing_card"]["metaphor_sentence"] == "새벽 공기를 밀고 올라오는 곧은 나무의 첫 숨"
+    assert body["reading"]["healing_card"]["direction"] == "동쪽"
+    assert body["reading"]["secret_door"]["unexplored_area"] == "관계와 협업의 다음 문"
+    assert body["saju"]["yonghuishin"]["yongshin"]["final_yongshin"][0]["element"]
+    assert body["saju"]["current_luck"]["annual"]["pillar"]
+    assert body["saju"]["dominant_ten_god"]["name"]
     assert provider.calls[-1]["max_output_tokens"] == 5000
 
 
@@ -752,7 +760,7 @@ def test_final_reading_reports_schema_validation_details() -> None:
 
     app.dependency_overrides.clear()
     assert response.status_code == 502
-    assert "period_guidance" in response.json()["detail"]
+    assert "compass_summary" in response.json()["detail"]
 
 
 def test_final_reading_reports_json_syntax_error() -> None:

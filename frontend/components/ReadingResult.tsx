@@ -1,27 +1,31 @@
 "use client";
 
 import { toPng } from "html-to-image";
-import { useRef, useState, type RefObject } from "react";
+import { useRef, useState, type ReactNode, type RefObject } from "react";
 import {
   ArrowLeft,
   BadgeCheck,
-  BookOpen,
+  BarChart3,
   CalendarClock,
   CircleAlert,
-  ClipboardCheck,
+  Compass,
   Copy,
   Download,
+  Flame,
   Gem,
+  MapPinned,
+  MoonStar,
   RefreshCcw,
   Share2,
-  ShieldCheck,
   Sparkles,
+  Sprout,
   Star,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 
 import { SajuPillarsTable } from "@/components/SajuPillarsTable";
-import type { DaewoonPeriod, FinalReadingResponse, PeriodGuidanceItem, ReadingStyle } from "@/lib/api";
+import type { FinalReadingResponse, ReadingStyle, TenGodScore, TimeLuckPillar, YonghuishinCandidate } from "@/lib/api";
 
 const elementLabels: Record<string, string> = {
   wood: "목",
@@ -32,43 +36,22 @@ const elementLabels: Record<string, string> = {
 };
 
 const elementOrder = ["wood", "fire", "earth", "metal", "water"] as const;
-
 type ElementKey = (typeof elementOrder)[number];
 
 const elementColors: Record<ElementKey, string> = {
-  wood: "#5A6B5D",
-  fire: "#C57B57",
-  earth: "#B79B5A",
-  metal: "#8A8178",
-  water: "#5B7187",
+  wood: "#4f8f6b",
+  fire: "#d45c3f",
+  earth: "#c6a14a",
+  metal: "#9aa0a6",
+  water: "#4f6fa5",
 };
 
-const elementProfiles: Record<ElementKey, { term: string; plain: string; daily: string }> = {
-  wood: {
-    term: "목(木)",
-    plain: "성장, 기획, 배움, 관계를 넓히는 힘",
-    daily: "작게 시작해 꾸준히 키우는 루틴으로 살아납니다.",
-  },
-  fire: {
-    term: "화(火)",
-    plain: "표현, 열정, 주목도, 감정의 온도를 올리는 힘",
-    daily: "생각을 밖으로 말하고 보여주는 행동으로 살아납니다.",
-  },
-  earth: {
-    term: "토(土)",
-    plain: "현실감, 안정, 책임, 계획을 뿌리내리는 힘",
-    daily: "정리, 일정표, 예산처럼 생활의 바닥을 단단히 만들 때 살아납니다.",
-  },
-  metal: {
-    term: "금(金)",
-    plain: "판단, 기준, 정리, 결단과 완성도를 세우는 힘",
-    daily: "우선순위를 줄이고 기준을 문장으로 꺼낼 때 살아납니다.",
-  },
-  water: {
-    term: "수(水)",
-    plain: "정보, 사고, 유연성, 흐름을 읽고 바꾸는 힘",
-    daily: "충분히 살피되 결론을 적어 실행으로 옮길 때 살아납니다.",
-  },
+const cardThemes: Record<ElementKey, { bg: string; accent: string; soft: string; text: string }> = {
+  wood: { bg: "#173f32", accent: "#7ad0a1", soft: "rgba(122, 208, 161, 0.18)", text: "#f3fff8" },
+  fire: { bg: "#4b1e24", accent: "#ff8a58", soft: "rgba(255, 138, 88, 0.18)", text: "#fff7ef" },
+  earth: { bg: "#40351f", accent: "#f0c95d", soft: "rgba(240, 201, 93, 0.18)", text: "#fff9e8" },
+  metal: { bg: "#24272b", accent: "#dfe4e8", soft: "rgba(223, 228, 232, 0.16)", text: "#f8fbfd" },
+  water: { bg: "#111b31", accent: "#7fa7e6", soft: "rgba(127, 167, 230, 0.18)", text: "#f2f7ff" },
 };
 
 const stemProfiles: Record<string, { term: string; plain: string }> = {
@@ -82,40 +65,6 @@ const stemProfiles: Record<string, { term: string; plain: string }> = {
   辛: { term: "신금(辛金)", plain: "보석처럼 섬세하게 완성도와 품질을 높이는 성향" },
   壬: { term: "임수(壬水)", plain: "큰 물처럼 흐름을 읽고 넓게 연결하며 유연하게 움직이는 성향" },
   癸: { term: "계수(癸水)", plain: "비와 이슬처럼 조용히 관찰하고 깊이 흡수하는 성향" },
-};
-
-const animalProfiles: Record<string, { title: string; animal: string; line: string; reason: string }> = {
-  甲: { title: "개척형 호랑이", animal: "호랑이", line: "새 길을 여는 기운을 가진 호랑이", reason: "갑목은 큰 나무처럼 방향을 세우고 밀고 나가는 힘이라, 먼저 길을 터는 호랑이로 비유합니다." },
-  乙: { title: "적응형 사슴", animal: "사슴", line: "유연하게 길을 찾는 기운을 가진 사슴", reason: "을목은 풀과 덩굴처럼 환경을 읽고 적응하는 힘이라, 민감하게 길을 고르는 사슴으로 비유합니다." },
-  丙: { title: "확산형 사자", animal: "사자", line: "밝게 드러내고 확산하는 기운을 가진 사자", reason: "병화는 태양처럼 존재감을 드러내고 분위기를 밝히는 힘이라, 무대 위에서 힘이 커지는 사자로 비유합니다." },
-  丁: { title: "집중형 여우", animal: "여우", line: "필요한 곳에 집중하는 기운을 가진 여우", reason: "정화는 촛불처럼 한 지점을 오래 밝히는 힘이라, 섬세하게 판단하고 집중하는 여우로 비유합니다." },
-  戊: { title: "중심형 코끼리", animal: "코끼리", line: "흔들리는 판의 중심을 잡는 기운을 가진 코끼리", reason: "무토는 산처럼 큰 중심을 잡는 힘이라, 주변을 안정시키며 버티는 코끼리로 비유합니다." },
-  己: { title: "양육형 토끼", animal: "토끼", line: "현실을 돌보고 길러내는 기운을 가진 토끼", reason: "기토는 밭처럼 현실을 다지고 키우는 힘이라, 작은 변화를 살피며 돌보는 토끼로 비유합니다." },
-  庚: { title: "결단형 늑대", animal: "늑대", line: "기준을 세워 결단하는 기운을 가진 늑대", reason: "경금은 큰 쇠처럼 기준을 세우고 잘라내는 힘이라, 무리 속에서도 결정을 내리는 늑대로 비유합니다." },
-  辛: { title: "정교형 백조", animal: "백조", line: "섬세하게 완성도를 높이는 기운을 가진 백조", reason: "신금은 보석처럼 세부를 다듬고 품질을 높이는 힘이라, 정교한 균형감이 있는 백조로 비유합니다." },
-  壬: { title: "흐름형 고래", animal: "고래", line: "큰 흐름을 읽고 연결하는 기운을 가진 고래", reason: "임수는 큰 물처럼 넓게 흐름을 보고 연결하는 힘이라, 깊고 넓게 움직이는 고래로 비유합니다." },
-  癸: { title: "통찰형 올빼미", animal: "올빼미", line: "조용히 살피고 깊이 꿰뚫는 기운을 가진 올빼미", reason: "계수는 비와 이슬처럼 조용히 스며들어 이해하는 힘이라, 보이지 않는 맥락을 읽는 올빼미로 비유합니다." },
-};
-
-const tenGodProfiles: Record<string, { term: string; plain: string }> = {
-  비견: { term: "비견(比肩)", plain: "나와 같은 기운입니다. 자기 기준, 독립성, 주체성을 뜻합니다." },
-  겁재: { term: "겁재(劫財)", plain: "사람 속에서 판을 키우는 기운입니다. 경쟁심, 확장력, 관계의 경계를 뜻합니다." },
-  식신: { term: "식신(食神)", plain: "내 능력을 안정적으로 꺼내는 기운입니다. 꾸준함, 생산성, 결과물을 뜻합니다." },
-  상관: { term: "상관(傷官)", plain: "기존 틀을 바꾸는 표현의 기운입니다. 개성, 변화, 말과 감각을 뜻합니다." },
-  편재: { term: "편재(偏財)", plain: "기회를 빠르게 보는 현실 감각입니다. 활동성, 영업력, 움직이는 재물을 뜻합니다." },
-  정재: { term: "정재(正財)", plain: "계획적으로 쌓고 관리하는 기운입니다. 안정성, 성실함, 재정 관리를 뜻합니다." },
-  편관: { term: "편관(偏官)", plain: "압박을 견디며 돌파하는 기운입니다. 책임, 긴장, 승부수를 뜻합니다." },
-  정관: { term: "정관(正官)", plain: "질서와 신뢰를 세우는 기운입니다. 규칙, 책임, 절제력을 뜻합니다." },
-  편인: { term: "편인(偏印)", plain: "남들이 놓치는 맥락을 읽는 기운입니다. 직감, 탐구, 독특한 관점을 뜻합니다." },
-  정인: { term: "정인(正印)", plain: "배우고 흡수하는 보호의 기운입니다. 학습, 문서, 안정적인 도움을 뜻합니다." },
-};
-
-const elementTextPatterns: Record<ElementKey, string[]> = {
-  wood: ["목(木)", "목의 기운", "목 기운", "나무의 기운"],
-  fire: ["화(火)", "화의 기운", "화 기운", "불의 기운"],
-  earth: ["토(土)", "토의 기운", "토 기운", "흙의 기운"],
-  metal: ["금(金)", "금의 기운", "금 기운", "쇠의 기운"],
-  water: ["수(水)", "수의 기운", "수 기운", "물의 기운"],
 };
 
 const personaLabels: Record<ReadingStyle, string> = {
@@ -137,72 +86,16 @@ function elementName(key: string) {
   return elementLabels[key] ?? key;
 }
 
-function isElementKey(key: string): key is ElementKey {
-  return elementOrder.includes(key as ElementKey);
+function formatElementLabel(element: string) {
+  return elementName(element);
+}
+
+function normalizeElement(key: string): ElementKey {
+  return elementOrder.includes(key as ElementKey) ? (key as ElementKey) : "wood";
 }
 
 function primaryElementColor(key: string) {
-  return elementColors[key as ElementKey] ?? "#5A6B5D";
-}
-
-function getAnimalProfile(dayMaster: string) {
-  return (
-    animalProfiles[dayMaster] ?? {
-      title: "균형형 동물",
-      animal: "동물",
-      line: "명식의 흐름을 자기 방식으로 쓰는 기운을 가진 동물",
-      reason: "일간은 사주에서 나를 대표하는 기준이므로, 핵심 성향을 가장 직관적인 동물 비유로 압축해 보여줍니다.",
-    }
-  );
-}
-
-function shareCardStrengths(card: FinalReadingResponse["reading"]["share_card"]) {
-  const strengths = Array.isArray(card.strengths) ? card.strengths.filter(Boolean).slice(0, 3) : [];
-  return strengths.length > 0 ? strengths : ["기준 세우기", "현실 감각"];
-}
-
-function findElementInText(text: string): ElementKey | null {
-  const normalizedText = text.replace(/\s+/g, " ");
-  return elementOrder.find((key) => elementTextPatterns[key].some((pattern) => normalizedText.includes(pattern))) ?? null;
-}
-
-function findTenGodInText(text: string) {
-  return Object.keys(tenGodProfiles).find((tenGod) => text.includes(tenGod)) ?? null;
-}
-
-function getPrimaryTenGod(result: FinalReadingResponse) {
-  const counts = new Map<string, number>();
-
-  Object.values(result.saju.ten_gods).forEach((tenGod) => {
-    if (!tenGod || tenGod === "일간") return;
-    counts.set(tenGod, (counts.get(tenGod) ?? 0) + 1);
-  });
-
-  return Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-}
-
-function getShareCardDensity(card: FinalReadingResponse["reading"]["share_card"]) {
-  const totalLength = card.core_saju_feature.length + card.balancing_need.length + card.daily_element.length + shareCardStrengths(card).join("").length;
-
-  if (totalLength > 230) return "tight";
-  if (totalLength > 175) return "compact";
-  return "normal";
-}
-
-function getEasyTermSummary(text: string, result: FinalReadingResponse) {
-  const dayElement = isElementKey(result.saju.day_master_element) ? result.saju.day_master_element : "earth";
-  const foundElement = findElementInText(text) ?? dayElement;
-  const foundTenGod = findTenGodInText(text) ?? getPrimaryTenGod(result);
-  const descriptions = [
-    `일간 ${result.saju.day_master}은 사주에서 나 자신을 보는 기준입니다.`,
-    `${elementProfiles[foundElement].term}은 ${elementProfiles[foundElement].plain}입니다.`,
-  ];
-
-  if (foundTenGod && tenGodProfiles[foundTenGod]) {
-    descriptions.push(`${tenGodProfiles[foundTenGod].term}은 ${tenGodProfiles[foundTenGod].plain.replace("입니다.", "으로 봅니다.")}`);
-  }
-
-  return descriptions.join(" ");
+  return elementColors[normalizeElement(key)];
 }
 
 function downloadDataUrl(dataUrl: string, fileName: string) {
@@ -210,6 +103,25 @@ function downloadDataUrl(dataUrl: string, fileName: string) {
   link.download = fileName;
   link.href = dataUrl;
   link.click();
+}
+
+function getPrimaryYongshin(result: FinalReadingResponse) {
+  return result.saju.yonghuishin.yongshin.final_yongshin[0] ?? { element: result.saju.day_master_element, score: null, reason: "일간의 기본 기운을 중심으로 봅니다." };
+}
+
+function scoreToPercent(score: number | null, maxScore: number) {
+  if (score === null || maxScore <= 0) return 0;
+  return Math.max(0, Math.min(100, (score / maxScore) * 100));
+}
+
+function confidencePercent(value: number) {
+  const normalized = value > 1 ? value : value * 100;
+  return Math.max(0, Math.min(100, Math.round(normalized)));
+}
+
+function formatCandidate(candidate: YonghuishinCandidate) {
+  const score = candidate.score === null ? "점수 없음" : candidate.score.toFixed(3);
+  return `${formatElementLabel(candidate.element)} · ${score}`;
 }
 
 function SectionHeading({
@@ -241,19 +153,212 @@ function SectionHeading({
   );
 }
 
-function CoverGlyph({ element }: { element: string }) {
-  const color = primaryElementColor(element);
+function AnalysisStatCard({
+  icon: Icon,
+  label,
+  title,
+  metric,
+  body,
+  tone = "sage",
+  children,
+}: {
+  icon: LucideIcon;
+  label: string;
+  title: string;
+  metric: string;
+  body: string;
+  tone?: "sage" | "terracotta" | "neutral";
+  children?: ReactNode;
+}) {
+  const toneClass =
+    tone === "terracotta"
+      ? "bg-terracotta/10 text-terracotta dark:text-[#d58c6d]"
+      : tone === "neutral"
+        ? "bg-surface-muted text-stone-600 dark:text-stone-300"
+        : "bg-sage/10 text-sage dark:text-[#c9d4bd]";
 
   return (
-    <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[38%] overflow-hidden lg:block" aria-hidden>
-      <div className="absolute right-5 top-14 h-48 w-48 rounded-full border opacity-30 motion-safe:animate-pulse" style={{ borderColor: color }} />
-      <div className="absolute right-20 top-24 h-32 w-32 rounded-full" style={{ backgroundColor: `${color}18` }} />
-      <div className="absolute bottom-14 right-8 grid gap-3">
-        {[0, 1, 2].map((line) => (
-          <span key={line} className="block h-px w-44" style={{ backgroundColor: color, opacity: 0.34 - line * 0.06 }} />
-        ))}
+    <article className="min-w-0 rounded-lg border border-border bg-surface p-4">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <p className={`inline-flex min-w-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-black ${toneClass}`}>
+          <Icon size={14} aria-hidden />
+          <span className="min-w-0 break-keep">{label}</span>
+        </p>
+        <span className="shrink-0 rounded-lg bg-surface-muted px-3 py-1.5 text-xs font-black text-stone-600 dark:text-stone-300">{metric}</span>
+      </div>
+      <h4 className="mt-4 break-keep font-serif text-2xl font-black leading-tight text-foreground [overflow-wrap:anywhere]">{title}</h4>
+      <p className="mt-3 break-keep text-sm font-bold leading-6 text-stone-600 dark:text-stone-300">{body}</p>
+      {children && <div className="mt-4 min-w-0">{children}</div>}
+    </article>
+  );
+}
+
+function ElementPowerBars({ result }: { result: FinalReadingResponse }) {
+  const power = result.saju.yonghuishin.element_power;
+  const maxPower = Math.max(0.001, ...elementOrder.map((key) => power[key] ?? 0));
+
+  return (
+    <div className="min-w-0 rounded-lg border border-border bg-surface p-4">
+      <div className="mb-4 flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h4 className="text-sm font-black text-foreground">오행 세력</h4>
+          <p className="mt-1 break-keep text-xs font-bold leading-5 text-stone-500 dark:text-stone-400">지장간·월령·통근·투출 보정값입니다.</p>
+        </div>
+        <span className="shrink-0 rounded-lg bg-surface-muted px-3 py-2 text-xs font-black text-stone-600 dark:text-stone-300">계산값</span>
+      </div>
+
+      <div className="space-y-3">
+        {elementOrder.map((key) => {
+          const value = power[key] ?? 0;
+          return (
+            <div key={key} className="grid min-w-0 grid-cols-[34px_minmax(0,1fr)_48px] items-center gap-3 text-sm font-bold text-stone-700 dark:text-stone-300">
+              <span>{formatElementLabel(key)}</span>
+              <div className="h-3 min-w-0 overflow-hidden rounded-full bg-surface-muted">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${scoreToPercent(value, maxPower)}%`, backgroundColor: elementColors[key] }}
+                  aria-hidden
+                />
+              </div>
+              <span className="text-right text-foreground">{value.toFixed(2)}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
+  );
+}
+
+function CandidateGroup({ label, candidates, tone }: { label: string; candidates: YonghuishinCandidate[]; tone: "sage" | "terracotta" | "neutral" }) {
+  const toneClass =
+    tone === "terracotta"
+      ? "bg-terracotta/10 text-terracotta dark:text-[#d58c6d]"
+      : tone === "neutral"
+        ? "bg-surface-muted text-stone-600 dark:text-stone-300"
+        : "bg-sage/10 text-sage dark:text-[#c9d4bd]";
+  const maxScore = Math.max(0.001, ...candidates.map((candidate) => Math.abs(candidate.score ?? 0)));
+
+  return (
+    <div className="min-w-0 rounded-lg border border-border bg-surface p-4">
+      <p className={`inline-flex rounded-lg px-3 py-1.5 text-xs font-black ${toneClass}`}>{label}</p>
+      <div className="mt-4 space-y-3">
+        {candidates.map((candidate, index) => {
+          const color = primaryElementColor(candidate.element);
+          const score = Math.abs(candidate.score ?? 0);
+          return (
+            <div key={`${label}-${candidate.element}-${index}`} className="min-w-0 rounded-lg bg-surface-muted p-3">
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <p className="min-w-0 break-keep text-sm font-black text-foreground">{formatCandidate(candidate)}</p>
+                <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden />
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface">
+                <div className="h-full rounded-full" style={{ width: `${scoreToPercent(score, maxScore)}%`, backgroundColor: color }} aria-hidden />
+              </div>
+              <p className="mt-3 break-keep text-xs font-bold leading-5 text-stone-500 dark:text-stone-400">{candidate.reason}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DeterministicAnalysisPanel({ result }: { result: FinalReadingResponse }) {
+  const { saju } = result;
+  const analysis = saju.yonghuishin;
+  const { strength, geokguk, yongshin, interpretation } = analysis;
+  const finalYongshin = yongshin.final_yongshin[0];
+  const monthSource = geokguk.selected_from_month;
+  const pillarSummary = (["year", "month", "day", "hour"] as const).map((key) => saju.pillars[key].pillar).join(" · ");
+  const dominantTenGod = `${saju.dominant_ten_god.name} ${saju.dominant_ten_god.score.toFixed(1)}`;
+  const finalYongshinLabel = yongshin.final_yongshin.map((candidate) => formatElementLabel(candidate.element)).join(" · ");
+
+  return (
+    <section className="mt-5 min-w-0 rounded-lg border border-border bg-background/60 p-4 dark:bg-[#242321]">
+      <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="inline-flex max-w-full items-center gap-2 rounded-lg bg-surface px-3 py-1.5 text-xs font-black text-sage dark:text-[#c9d4bd]">
+            <BarChart3 size={14} aria-hidden />
+            <span className="min-w-0 break-keep">계산 기반 분석</span>
+          </p>
+          <h4 className="mt-3 break-keep font-serif text-xl font-black leading-8 text-foreground">원국과 용희신 판정값</h4>
+        </div>
+        <div className="grid min-w-0 gap-2 text-xs font-black text-stone-600 sm:grid-cols-3 dark:text-stone-300">
+          <span className="min-w-0 rounded-lg bg-surface px-3 py-2 text-center [overflow-wrap:anywhere]">일간 {saju.day_master} · {formatElementLabel(saju.day_master_element)}</span>
+          <span className="min-w-0 rounded-lg bg-surface px-3 py-2 text-center [overflow-wrap:anywhere]">월령 {saju.pillars.month.branch}</span>
+          <span className="min-w-0 rounded-lg bg-surface px-3 py-2 text-center [overflow-wrap:anywhere]">주요 십성 {dominantTenGod}</span>
+        </div>
+      </div>
+
+      <div className="mb-4 rounded-lg border border-border bg-surface p-4">
+        <p className="text-xs font-black text-stone-500 dark:text-stone-400">원국 요약</p>
+        <p className="mt-2 break-keep text-base font-black leading-7 text-foreground [overflow-wrap:anywhere]">{pillarSummary}</p>
+        <p className="mt-2 break-keep text-sm font-bold leading-6 text-stone-600 dark:text-stone-300">{interpretation.summary}</p>
+      </div>
+
+      <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+        <AnalysisStatCard
+          icon={Target}
+          label="일간 강약"
+          title={strength.label}
+          metric={`${confidencePercent(strength.strength_index)}%`}
+          body={interpretation.strength_reading}
+        >
+          <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <div className="rounded-lg bg-surface-muted px-3 py-2 text-xs font-black text-stone-600 dark:text-stone-300">생조 {strength.support_score.toFixed(2)}</div>
+            <div className="rounded-lg bg-surface-muted px-3 py-2 text-xs font-black text-stone-600 dark:text-stone-300">소모·제어 {strength.drain_score.toFixed(2)}</div>
+          </div>
+        </AnalysisStatCard>
+
+        <AnalysisStatCard
+          icon={Star}
+          label="격국"
+          title={geokguk.name}
+          metric={`${confidencePercent(geokguk.confidence)}%`}
+          body={interpretation.geokguk_reading}
+          tone="neutral"
+        >
+          <div className="grid min-w-0 gap-2 text-xs font-black text-stone-600 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3 dark:text-stone-300">
+            <span className="rounded-lg bg-surface-muted px-3 py-2 text-center">월지 {monthSource.month_branch}</span>
+            <span className="rounded-lg bg-surface-muted px-3 py-2 text-center">{monthSource.selected_hidden_stem} · {monthSource.ten_god}</span>
+            <span className="rounded-lg bg-surface-muted px-3 py-2 text-center">{monthSource.transmitted ? "투출" : "본기"}</span>
+          </div>
+        </AnalysisStatCard>
+
+        <AnalysisStatCard
+          icon={Compass}
+          label="최종 용신"
+          title={finalYongshinLabel}
+          metric={finalYongshin?.score === null || finalYongshin?.score === undefined ? "점수 없음" : finalYongshin.score.toFixed(3)}
+          body={interpretation.yongshin_reading}
+          tone="terracotta"
+        />
+      </div>
+
+      <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="grid min-w-0 gap-4">
+          <ElementPowerBars result={result} />
+          <div className="min-w-0 rounded-lg border border-border bg-surface p-4">
+            <p className="text-sm font-black text-foreground">판정 근거</p>
+            <div className="mt-3 grid min-w-0 gap-2">
+              {[...strength.evidence, ...geokguk.damage].map((item, index) => (
+                <p key={`${item}-${index}`} className="min-w-0 rounded-lg bg-surface-muted px-3 py-2 text-xs font-bold leading-5 text-stone-600 dark:text-stone-300">
+                  {item}
+                </p>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid min-w-0 gap-4">
+          <CandidateGroup label="용신" candidates={yongshin.final_yongshin} tone="terracotta" />
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+            <CandidateGroup label="희신" candidates={yongshin.huishin} tone="sage" />
+            <CandidateGroup label="기신" candidates={yongshin.gishin} tone="neutral" />
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -263,13 +368,13 @@ function ElementBars({ result }: { result: FinalReadingResponse }) {
 
   return (
     <div className="min-w-0 rounded-lg border border-border bg-surface p-4">
-      <div className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-4 flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <h4 className="text-sm font-black text-foreground">현재 기운 분포</h4>
+          <h4 className="text-sm font-black text-foreground">오행 분포</h4>
           <p className="mt-1 break-keep text-xs font-bold leading-5 text-stone-500 dark:text-stone-400">강한 기운과 비어 있는 기운을 함께 봅니다.</p>
         </div>
-        <div className="w-fit rounded-lg bg-surface-muted px-3 py-2 text-xs font-black text-stone-600 dark:text-stone-300">
-          일간 {result.saju.day_master} · {elementName(result.saju.day_master_element)}
+        <div className="shrink-0 rounded-lg bg-surface-muted px-3 py-2 text-xs font-black text-stone-600 dark:text-stone-300">
+          일간 {result.saju.day_master}
         </div>
       </div>
 
@@ -295,180 +400,143 @@ function ElementBars({ result }: { result: FinalReadingResponse }) {
   );
 }
 
-function DaewoonTimeline({ periods }: { periods: DaewoonPeriod[] }) {
-  return (
-    <div className="min-w-0 rounded-lg border border-border bg-surface p-4">
-      <h4 className="mb-3 text-sm font-black text-foreground">대운 키워드</h4>
-      <div className="grid min-w-0 gap-2 sm:grid-cols-3">
-        {periods.slice(0, 3).map((period) => (
-          <div key={`${period.order}-${period.pillar}`} className="min-w-0 rounded-lg bg-surface-muted px-3 py-3">
-            <div className="flex min-w-0 items-center justify-between gap-3">
-              <span className="font-serif text-lg font-black text-foreground">{period.pillar}</span>
-              <span className="shrink-0 text-xs font-black text-stone-500 dark:text-stone-400">
-                {period.age_start}-{period.age_end}세
-              </span>
-            </div>
-            <p className="mt-1 break-keep text-xs font-bold leading-5 text-stone-600 dark:text-stone-300">
-              {period.start_year}년 시작 · {period.stem_ten_god} · {elementName(period.main_element)}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+function LuckChip({ luck, icon: Icon }: { luck: TimeLuckPillar; icon: LucideIcon }) {
+  const color = primaryElementColor(luck.stem_element);
 
-function EvidenceList({ items }: { items: string[] }) {
   return (
-    <div className="min-w-0 rounded-lg border border-border bg-surface p-4">
-      <h4 className="mb-3 text-sm font-black text-foreground">명리학적 근거</h4>
-      <ul className="space-y-2 text-sm font-bold leading-6 text-stone-700 dark:text-stone-300">
-        {items.map((item, index) => (
-          <li key={`${item}-${index}`} className="flex min-w-0 gap-2 rounded-lg bg-surface-muted px-3 py-2">
-            <span className="shrink-0 text-sage dark:text-[#c9d4bd]">{index + 1}</span>
-            <span className="min-w-0 break-keep">{item}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function PeriodGuidanceCard({ item }: { item: PeriodGuidanceItem }) {
-  return (
-    <article className="min-w-0 rounded-lg border border-border bg-background/70 p-4 dark:bg-[#242321]">
-      <p className="text-xs font-black text-sage dark:text-[#c9d4bd]">{item.label}</p>
-      <p className="mt-2 break-keep text-sm font-black leading-6 text-foreground">{item.saju_feature}</p>
-      <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
-        <div className="min-w-0 rounded-lg bg-surface p-3">
-          <p className="text-xs font-black text-sage dark:text-[#c9d4bd]">좋은 흐름</p>
-          <p className="mt-2 break-keep text-sm font-semibold leading-6 text-stone-700 dark:text-stone-300">{item.good}</p>
-        </div>
-        <div className="min-w-0 rounded-lg bg-surface p-3">
-          <p className="text-xs font-black text-terracotta dark:text-[#d58c6d]">조심할 점</p>
-          <p className="mt-2 break-keep text-sm font-semibold leading-6 text-stone-700 dark:text-stone-300">{item.caution}</p>
-        </div>
+    <article className="min-w-0 rounded-lg border border-border bg-surface p-4">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <p className="inline-flex min-w-0 items-center gap-2 text-xs font-black text-stone-500 dark:text-stone-400">
+          <Icon size={15} aria-hidden />
+          <span className="min-w-0 break-keep">{luck.label}</span>
+        </p>
+        <span className="shrink-0 rounded-lg px-2 py-1 text-xs font-black text-white" style={{ backgroundColor: color }}>
+          {elementName(luck.stem_element)}
+        </span>
       </div>
+      <div className="mt-3 flex min-w-0 items-end gap-3">
+        <span className="font-serif text-4xl font-black leading-none text-foreground">{luck.pillar}</span>
+        <span className="pb-1 text-xs font-bold text-stone-500 dark:text-stone-400">{luck.representative_date}</span>
+      </div>
+      <p className="mt-3 break-keep text-sm font-bold leading-6 text-stone-700 dark:text-stone-300">
+        천간 {luck.stem_ten_god} · 지지 {luck.branch_ten_god}
+      </p>
     </article>
   );
 }
 
-function SummaryCard({ refNode, name, result }: { refNode: RefObject<HTMLDivElement | null>; name: string; result: FinalReadingResponse }) {
-  const card = result.reading.share_card;
-  const animalProfile = getAnimalProfile(result.saju.day_master);
-  const strengths = shareCardStrengths(card);
-  const density = getShareCardDensity(card);
-  const titleClass = density === "tight" ? "text-[1.7rem] leading-8" : density === "compact" ? "text-3xl leading-9" : "text-[2rem] leading-10";
-  const bodyClass = density === "tight" ? "text-[0.8rem] leading-5" : "text-sm leading-6";
+function TenGodScores({ scores, dominant }: { scores: TenGodScore[]; dominant: TenGodScore }) {
+  const topScores = scores.length > 0 ? scores.slice(0, 4) : [dominant];
+  const maxScore = Math.max(1, ...topScores.map((score) => score.score));
 
   return (
-    <div
-      ref={refNode}
-      className="mx-auto min-h-[34.75rem] w-full max-w-[22rem] overflow-hidden rounded-lg border border-[#d8d0c2] bg-[#F7F6F3] p-4 text-[#24211f] shadow-ritual sm:min-h-[39.125rem] sm:p-5"
-    >
-      <div className="flex min-h-[32.75rem] min-w-0 flex-col justify-between gap-3 sm:min-h-[36.625rem] sm:gap-4">
+    <div className="min-w-0 rounded-lg border border-border bg-surface p-4">
+      <div className="mb-4 flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-black uppercase text-[#5A6B5D]">Saju-i · 실용 부적</p>
-            <p className="rounded-lg bg-white/75 px-3 py-1 text-xs font-black text-[#5A6B5D]">{result.saju.day_master}</p>
-          </div>
-          <p className="mt-4 text-xs font-black text-[#8a8178] sm:mt-6">{name}님의 사주 동물</p>
-          <h4 className={`mt-2 break-keep font-serif font-black tracking-normal text-[#24211f] [overflow-wrap:anywhere] ${titleClass}`}>{animalProfile.title}</h4>
-          <p className="mt-3 break-keep text-sm font-black leading-6 text-[#5A6B5D] [overflow-wrap:anywhere]">{animalProfile.line}</p>
-          <p className={`mt-3 break-keep font-bold text-[#5f5a52] [overflow-wrap:anywhere] sm:mt-4 ${bodyClass}`}>{card.core_saju_feature}</p>
+          <h4 className="text-sm font-black text-foreground">주무기 십성</h4>
+          <p className="mt-1 break-keep text-xs font-bold leading-5 text-stone-500 dark:text-stone-400">원국 안에서 가장 도드라진 작동 방식입니다.</p>
         </div>
+        <span className="shrink-0 rounded-lg bg-terracotta px-3 py-2 text-xs font-black text-white">{dominant.name}</span>
+      </div>
 
-        <div className="min-w-0 space-y-3">
-          <div className="rounded-lg border border-[#d8d0c2] bg-white/75 p-3 sm:p-4">
-            <p className="text-xs font-black text-[#8a8178]">고민 해결 부적</p>
-            <p className="mt-2 break-keep font-serif text-lg font-black leading-7 [overflow-wrap:anywhere]">{card.daily_element}</p>
-          </div>
-
-          <div className="rounded-lg border border-[#d8d0c2] bg-white/75 p-3">
-            <p className="text-xs font-black text-[#8a8178]">강점</p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {strengths.map((strength) => (
-                <span key={strength} className="min-w-0 rounded-lg bg-[#eef1e9] px-2.5 py-1 text-xs font-black leading-5 text-[#5A6B5D] [overflow-wrap:anywhere]">
-                  {strength}
-                </span>
-              ))}
+      <div className="space-y-3">
+        {topScores.map((score) => (
+          <div key={score.name} className="grid min-w-0 grid-cols-[48px_minmax(0,1fr)_38px] items-center gap-3 text-sm font-bold text-stone-700 dark:text-stone-300">
+            <span className="break-keep">{score.name}</span>
+            <div className="h-3 min-w-0 overflow-hidden rounded-full bg-surface-muted">
+              <div className="h-full rounded-full bg-terracotta" style={{ width: `${Math.max(8, (score.score / maxScore) * 100)}%` }} aria-hidden />
             </div>
+            <span className="text-right text-foreground">{score.score.toFixed(1)}</span>
           </div>
-
-          <div className="rounded-lg border border-[#d8d0c2] bg-white/75 p-3">
-            <p className="text-xs font-black text-[#8a8178]">보완할 기운</p>
-            <p className={`mt-2 break-keep font-black text-[#24211f] [overflow-wrap:anywhere] ${bodyClass}`}>{card.balancing_need}</p>
-          </div>
-
-          <div className="border-t border-[#d8d0c2] pt-3">
-            <p className="break-keep text-xs font-black leading-5 text-[#5A6B5D] [overflow-wrap:anywhere]">오늘은 강점을 쓰고, 부족한 기운은 작은 아이템으로 보완하세요.</p>
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );
 }
 
-function ShareCardExplanation({ result }: { result: FinalReadingResponse }) {
-  const { reading, saju } = result;
-  const card = reading.share_card;
-  const strengths = shareCardStrengths(card);
-  const animalProfile = getAnimalProfile(saju.day_master);
-  const cardText = [card.core_saju_feature, card.balancing_need, card.daily_element, card.daily_reason, strengths.join(" ")].join(" ");
-  const dayElement = isElementKey(saju.day_master_element) ? saju.day_master_element : "earth";
-  const focusElement = findElementInText(cardText) ?? dayElement;
-  const dayMasterProfile = stemProfiles[saju.day_master];
-  const tenGod = findTenGodInText(cardText) ?? getPrimaryTenGod(result);
-  const tenGodProfile = tenGod ? tenGodProfiles[tenGod] : null;
-  const strengthSentence = strengths.join(", ");
-
-  const explanationItems = [
-    {
-      label: "왜 이 동물인가 · 일간(日干)",
-      title: animalProfile.title,
-      body: `${animalProfile.reason} 일간은 사주에서 나를 대표하는 기준 글자라서, ${dayMasterProfile?.term ?? `${saju.day_master} 일간`}의 성향을 먼저 동물 비유로 압축했습니다.`,
-    },
-    {
-      label: "왜 이 부적인가 · 오행(五行)",
-      title: `고민 해결 부적: ${card.daily_element}`,
-      body: `${elementProfiles[focusElement].term}은 ${elementProfiles[focusElement].plain}입니다. ${card.daily_reason} 쉽게 말하면 ${elementProfiles[focusElement].daily}`,
-    },
-    {
-      label: "십성(十星)으로 보면",
-      title: tenGodProfile ? `${tenGodProfile.term}의 활용` : "강점 키워드",
-      body: tenGodProfile
-        ? `${tenGodProfile.plain} 이 카드에서는 그 힘을 ${strengthSentence}로 정리해 고민 해결에 바로 쓰게 했습니다.`
-        : `십성은 일간을 기준으로 다른 글자가 어떤 역할을 하는지 보는 용어입니다. 이 카드에서는 지금 쓸 수 있는 힘을 ${strengthSentence}로 정리했습니다.`,
-    },
-  ];
+function CompassSection({ result, concernText, name }: { result: FinalReadingResponse; concernText: string; name: string }) {
+  const { reading } = result;
+  const yongshin = getPrimaryYongshin(result);
 
   return (
-    <div className="min-w-0 rounded-lg border border-border bg-surface p-4 sm:p-5">
-      <div className="mb-4 flex min-w-0 items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sage text-white">
-          <BookOpen size={18} aria-hidden />
+    <section className="relative overflow-hidden rounded-lg border border-border bg-surface p-4 shadow-ritual sm:p-6 lg:p-7 dark:shadow-ritual-dark">
+      <div className="pointer-events-none absolute -right-16 top-8 h-56 w-56 rounded-full border opacity-25" style={{ borderColor: primaryElementColor(yongshin.element) }} aria-hidden />
+      <div className="relative z-10 min-w-0">
+        <div className="mb-5 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="inline-flex max-w-full items-center gap-2 rounded-lg bg-terracotta/10 px-3 py-1.5 text-xs font-black text-terracotta dark:text-[#d58c6d]">
+              <Compass size={14} aria-hidden />
+              <span className="min-w-0 break-keep">핵심 결론</span>
+            </p>
+          </div>
+          <div className="w-fit rounded-lg bg-surface-muted px-3 py-2 text-xs font-black text-stone-600 dark:text-stone-300">
+            필요한 기운 · {elementName(yongshin.element)}
+          </div>
         </div>
-        <div className="min-w-0">
-          <p className="text-xs font-black text-sage dark:text-[#c9d4bd]">카드 풀이</p>
-          <h4 className="mt-1 break-keep text-xl font-black leading-tight text-foreground">짧은 문장을 사주 용어로 풀어보면</h4>
+
+        <div className="min-w-0 max-w-4xl">
+          <div className="min-w-0 rounded-lg bg-surface-muted px-4 py-3">
+            <p className="text-xs font-black text-stone-500 dark:text-stone-400">{name}님이 입력한 고민</p>
+            <p className="mt-2 break-keep text-base font-black leading-7 text-foreground [overflow-wrap:anywhere]">{concernText}</p>
+          </div>
+          <p className="mt-5 text-xs font-black text-sage dark:text-[#c9d4bd]">핵심 결론</p>
+          <h2 className="mt-2 break-keep font-serif text-2xl font-black leading-tight text-foreground [overflow-wrap:anywhere] sm:text-4xl">{reading.compass_summary.strength_animal}</h2>
+          <p className="mt-4 break-keep text-base font-bold leading-8 text-stone-700 dark:text-stone-300">{reading.compass_summary.basis}</p>
+          <p className="mt-3 break-keep text-base font-black leading-8 text-sage dark:text-[#c9d4bd]">{reading.compass_summary.solution}</p>
         </div>
       </div>
+    </section>
+  );
+}
 
-      <div className="grid min-w-0 gap-3">
-        <div className="min-w-0 rounded-lg border border-border bg-background/70 p-4 dark:bg-[#242321]">
-          <p className="text-xs font-black text-sage dark:text-[#c9d4bd]">카드 핵심</p>
-          <p className="mt-2 break-keep text-base font-black leading-7 text-foreground [overflow-wrap:anywhere]">{animalProfile.line}</p>
-          <p className="mt-2 break-keep text-sm font-semibold leading-6 text-stone-600 [overflow-wrap:anywhere] dark:text-stone-300">{card.core_saju_feature}</p>
+function HealingCardVisual({ refNode, result, name }: { refNode: RefObject<HTMLDivElement | null>; result: FinalReadingResponse; name: string }) {
+  const card = result.reading.healing_card;
+  const yongshin = normalizeElement(getPrimaryYongshin(result).element);
+  const theme = cardThemes[yongshin];
+
+  return (
+    <div
+      ref={refNode}
+      className="relative min-h-[30rem] w-full overflow-hidden rounded-lg border border-black/20 p-5 shadow-ritual sm:min-h-[34rem] sm:p-7"
+      style={{ backgroundColor: theme.bg, color: theme.text }}
+    >
+      <div className="pointer-events-none absolute right-[-4rem] top-[-4rem] h-64 w-64 rounded-full blur-2xl" style={{ backgroundColor: theme.soft }} aria-hidden />
+      <div className="pointer-events-none absolute bottom-[-5rem] left-[-3rem] h-72 w-72 rounded-full blur-2xl" style={{ backgroundColor: theme.soft }} aria-hidden />
+
+      <div className="relative z-10 flex min-h-[27rem] min-w-0 flex-col justify-between gap-8 sm:min-h-[29rem]">
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <p className="inline-flex max-w-full items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-black backdrop-blur">
+            <MoonStar size={14} aria-hidden />
+            <span className="min-w-0 break-keep">나만의 힐링 오브제</span>
+          </p>
+          <p className="shrink-0 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-black backdrop-blur">
+            {elementName(yongshin)} · {card.direction}
+          </p>
         </div>
 
-        <div className="grid min-w-0 gap-3">
-          {explanationItems.map((item) => (
-            <article key={item.label} className="min-w-0 rounded-lg border border-border bg-background/70 p-4 dark:bg-[#242321]">
-              <p className="text-xs font-black text-stone-500 dark:text-stone-400">{item.label}</p>
-              <h5 className="mt-2 break-keep text-base font-black leading-7 text-foreground [overflow-wrap:anywhere]">{item.title}</h5>
-              <p className="mt-2 break-keep text-sm font-semibold leading-6 text-stone-600 [overflow-wrap:anywhere] dark:text-stone-300">{item.body}</p>
-            </article>
-          ))}
+        <div className="min-w-0 max-w-[40rem]">
+          <p className="text-xs font-black opacity-75">{name}님의 모바일 카드</p>
+          <h4 className="mt-3 max-w-[34rem] break-keep font-serif text-[2rem] font-black leading-tight tracking-normal [overflow-wrap:anywhere] sm:text-5xl">
+            {card.metaphor_sentence}
+          </h4>
+          <p className="mt-5 max-w-[34rem] break-keep text-lg font-black leading-8 [overflow-wrap:anywhere] sm:text-2xl" style={{ color: theme.accent }}>
+            {card.affirmation}
+          </p>
+        </div>
+
+        <div className="grid min-w-0 gap-2 text-xs font-black sm:grid-cols-3">
+          <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.08] px-3 py-3 backdrop-blur">
+            <span className="block opacity-65">행운 색상</span>
+            <span className="mt-1 block break-keep [overflow-wrap:anywhere]">{card.color}</span>
+          </div>
+          <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.08] px-3 py-3 backdrop-blur">
+            <span className="block opacity-65">방향</span>
+            <span className="mt-1 block break-keep [overflow-wrap:anywhere]">{card.direction}</span>
+          </div>
+          <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.08] px-3 py-3 backdrop-blur">
+            <span className="block opacity-65">작은 루틴</span>
+            <span className="mt-1 block break-keep [overflow-wrap:anywhere]">{card.ritual}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -482,18 +550,20 @@ export function ReadingResult({ result, profileName, initialConcern, readingStyl
   const [exportStatus, setExportStatus] = useState("");
   const trimmedName = profileName.trim() || "고객";
   const concernText = initialConcern.trim() || "지금 가장 신경 쓰이는 고민";
-  const animalProfile = getAnimalProfile(saju.day_master);
-  const shareStrengths = shareCardStrengths(reading.share_card);
+  const primaryYongshin = getPrimaryYongshin(result);
+  const dayMasterProfile = stemProfiles[saju.day_master];
 
   async function copyShareText() {
     const shareText = [
       reading.reading_title,
-      reading.desired_answer,
-      reading.core_message,
-      `사주 동물: ${animalProfile.title} - ${animalProfile.line}`,
-      `핵심 사주 특징: ${reading.share_card.core_saju_feature}`,
-      `고민 해결 부적: ${reading.share_card.daily_element}`,
-      `강점: ${shareStrengths.join(", ")}`,
+      reading.compass_summary.strength_animal,
+      reading.compass_summary.basis,
+      reading.compass_summary.solution,
+      `요약: ${reading.compass_summary.headline}`,
+      `힐링 카드: ${reading.healing_card.metaphor_sentence}`,
+      `오늘의 문장: ${reading.healing_card.affirmation}`,
+      `행운 요소: ${reading.healing_card.color} · ${reading.healing_card.direction}`,
+      `다음 흐름: ${reading.secret_door.teaser}`,
     ].join("\n");
 
     try {
@@ -513,24 +583,24 @@ export function ReadingResult({ result, profileName, initialConcern, readingStyl
       const dataUrl = await toPng(summaryCardRef.current, {
         cacheBust: true,
         pixelRatio: 2,
-        backgroundColor: "#F7F6F3",
+        backgroundColor: cardThemes[normalizeElement(primaryYongshin.element)].bg,
       });
 
       if (share) {
         const blob = await (await fetch(dataUrl)).blob();
-        const file = new File([blob], "saju-summary-card.png", { type: "image/png" });
+        const file = new File([blob], "saju-healing-card.png", { type: "image/png" });
         if (typeof navigator.share === "function" && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
           await navigator.share({
             files: [file],
             title: reading.reading_title,
-            text: reading.core_message,
+            text: reading.compass_summary.headline,
           });
           setExportStatus("공유 창을 열었습니다.");
           return;
         }
       }
 
-      downloadDataUrl(dataUrl, "saju-summary-card.png");
+      downloadDataUrl(dataUrl, "saju-healing-card.png");
       setExportStatus(share ? "이 브라우저에서는 공유 대신 PNG로 저장했습니다." : "PNG 저장을 시작했습니다.");
     } catch (error) {
       setExportStatus(error instanceof Error ? error.message : "요약 카드 생성에 실패했습니다.");
@@ -539,86 +609,68 @@ export function ReadingResult({ result, profileName, initialConcern, readingStyl
 
   return (
     <article className="w-full max-w-full space-y-4 overflow-hidden">
-      <section className="relative overflow-hidden rounded-lg border border-border bg-surface p-4 shadow-ritual sm:p-6 lg:p-7 dark:shadow-ritual-dark">
-        <CoverGlyph element={saju.day_master_element} />
-        <div className="relative z-10 min-w-0">
-          <div className="mb-6 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <p className="inline-flex max-w-full items-center gap-2 rounded-lg bg-surface-muted px-3 py-1.5 text-xs font-black text-sage dark:text-[#c9d4bd]">
-                <Sparkles size={14} aria-hidden /> <span className="min-w-0 break-keep">{personaLabels[readingStyle]}</span>
-              </p>
-              <p className="mt-3 break-keep text-sm font-bold leading-6 text-stone-500 dark:text-stone-400">
-                {saju.solar_date} · {saju.birth_time} · 일간 {saju.day_master}({elementName(saju.day_master_element)})
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={onBack}
-                className="flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-bold text-stone-600 transition hover:border-sage hover:text-sage dark:text-stone-300"
-              >
-                <ArrowLeft size={16} aria-hidden />
-                답변 수정
-              </button>
-              <button
-                type="button"
-                onClick={copyShareText}
-                className="flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-bold text-stone-600 transition hover:border-terracotta hover:text-terracotta dark:text-stone-300"
-              >
-                <Copy size={16} aria-hidden />
-                {copied ? "복사 완료" : "요약 복사"}
-              </button>
-              <button
-                type="button"
-                onClick={onRestart}
-                className="flex h-10 items-center justify-center gap-2 rounded-lg bg-sage px-3 text-sm font-bold text-white transition hover:bg-[#4c5d50]"
-              >
-                <RefreshCcw size={16} aria-hidden />
-                처음
-              </button>
-            </div>
+      <section className="rounded-lg border border-border bg-surface p-4 shadow-ritual sm:p-5 dark:shadow-ritual-dark">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="inline-flex max-w-full items-center gap-2 rounded-lg bg-surface-muted px-3 py-1.5 text-xs font-black text-sage dark:text-[#c9d4bd]">
+              <Sparkles size={14} aria-hidden />
+              <span className="min-w-0 break-keep">{personaLabels[readingStyle]}</span>
+            </p>
+            <p className="mt-3 break-keep text-sm font-bold leading-6 text-stone-500 dark:text-stone-400">
+              기준일 {saju.current_luck.reference_date} · 일간 {saju.day_master}({elementName(saju.day_master_element)})
+            </p>
           </div>
-
-          <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.45fr)]">
-            <div className="min-w-0 max-w-3xl">
-              <p className="mb-3 inline-flex rounded-lg bg-terracotta/10 px-3 py-1.5 text-xs font-black text-terracotta dark:text-[#d58c6d]">핵심 결론</p>
-              <h2 className="break-keep font-serif text-3xl font-black leading-tight text-foreground sm:text-4xl">{reading.reading_title}</h2>
-              <p className="mt-5 break-keep font-serif text-xl font-black leading-8 text-foreground sm:text-2xl">{reading.desired_answer}</p>
-              <p className="mt-4 break-keep text-lg font-black leading-8 text-sage dark:text-[#c9d4bd]">{reading.core_message}</p>
-              <p className="mt-5 break-keep rounded-lg bg-surface-muted px-4 py-3 text-sm font-bold leading-6 text-stone-600 dark:text-stone-300">
-                상담 주제: {concernText}
-              </p>
-            </div>
-
-            <div className="min-w-0 rounded-lg border border-border bg-background/70 p-4 dark:bg-[#242321]">
-              <p className="text-xs font-black text-sage dark:text-[#c9d4bd]">근거 요약</p>
-              <ul className="mt-3 space-y-2 text-sm font-bold leading-6 text-stone-700 dark:text-stone-300">
-                {reading.saju_basis.slice(0, 3).map((item, index) => (
-                  <li key={`${item}-${index}`} className="flex min-w-0 gap-2">
-                    <span className="shrink-0 text-sage dark:text-[#c9d4bd]">{index + 1}</span>
-                    <span className="min-w-0 break-keep">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-bold text-stone-600 transition hover:border-sage hover:text-sage dark:text-stone-300"
+            >
+              <ArrowLeft size={16} aria-hidden />
+              답변 수정
+            </button>
+            <button
+              type="button"
+              onClick={copyShareText}
+              className="flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-bold text-stone-600 transition hover:border-terracotta hover:text-terracotta dark:text-stone-300"
+            >
+              <Copy size={16} aria-hidden />
+              {copied ? "복사 완료" : "요약 복사"}
+            </button>
+            <button
+              type="button"
+              onClick={onRestart}
+              className="flex h-10 items-center justify-center gap-2 rounded-lg bg-sage px-3 text-sm font-bold text-white transition hover:bg-[#4c5d50]"
+            >
+              <RefreshCcw size={16} aria-hidden />
+              처음
+            </button>
           </div>
         </div>
       </section>
 
+      <CompassSection result={result} concernText={concernText} name={trimmedName} />
+
       <section className="min-w-0 rounded-lg border border-border bg-surface p-4 shadow-ritual sm:p-5 dark:shadow-ritual-dark">
-        <SectionHeading index="01" icon={Star} label="사주 근거" title={reading.saju_insight.headline} description="고민이 생긴 이유를 실제 명식 흐름으로 풀이합니다." />
-        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-          <div className="min-w-0">
-            <p className="whitespace-pre-line break-keep text-base font-bold leading-8 text-stone-700 dark:text-stone-300">{reading.saju_insight.summary}</p>
-            <p className="mt-4 whitespace-pre-line break-keep text-base font-semibold leading-8 text-stone-600 dark:text-stone-300">{reading.saju_insight.detail}</p>
-          </div>
+        <SectionHeading index="02" icon={Star} label="만세력 요약" title={reading.manse_summary.headline} description="기운의 분포와 주요한 작동 방식을 한눈에 봅니다." />
+        <p className="mb-4 break-keep text-base font-bold leading-8 text-stone-700 dark:text-stone-300">{reading.manse_summary.energy_overview}</p>
+        <div className="mb-4 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {reading.manse_summary.key_traits.map((trait, index) => (
+            <div key={`${trait}-${index}`} className="min-w-0 rounded-lg bg-surface-muted px-4 py-3 text-sm font-black leading-6 text-stone-700 dark:text-stone-300">
+              {trait}
+            </div>
+          ))}
+        </div>
+        <DeterministicAnalysisPanel result={result} />
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
           <div className="grid min-w-0 gap-4">
             <ElementBars result={result} />
-            <DaewoonTimeline periods={saju.daewoon} />
+            <TenGodScores scores={saju.ten_god_scores} dominant={saju.dominant_ten_god} />
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+              <LuckChip luck={saju.current_luck.annual} icon={Flame} />
+              <LuckChip luck={saju.current_luck.next_month} icon={CalendarClock} />
+            </div>
           </div>
-        </div>
-        <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <EvidenceList items={reading.saju_basis} />
           <div className="min-w-0">
             <SajuPillarsTable saju={saju} />
           </div>
@@ -626,62 +678,76 @@ export function ReadingResult({ result, profileName, initialConcern, readingStyl
       </section>
 
       <section className="min-w-0 rounded-lg border border-border bg-background/70 p-4 shadow-ritual sm:p-5 dark:bg-[#242321] dark:shadow-ritual-dark">
-        <SectionHeading index="02" icon={ClipboardCheck} label="최종 해답" title={reading.clear_solution.headline} description="결론이 행동으로 이어지도록 기준을 정리합니다." />
-        <div className="min-w-0 rounded-lg border border-border bg-surface p-4">
-          <p className="whitespace-pre-line break-keep text-base font-bold leading-8 text-stone-700 dark:text-stone-300">{reading.clear_solution.summary}</p>
-          <p className="mt-4 whitespace-pre-line break-keep text-base font-semibold leading-8 text-stone-600 dark:text-stone-300">{reading.clear_solution.detail}</p>
-        </div>
-
-        <div className="mt-4 min-w-0">
-          <h4 className="mb-3 text-sm font-black text-foreground">시기별 흐름</h4>
-          <div className="grid min-w-0 gap-3">
-            {reading.period_guidance.map((item) => (
-              <PeriodGuidanceCard key={item.label} item={item} />
-            ))}
-          </div>
+        <SectionHeading index="03" icon={Sprout} label="사주 풀이" title="운명의 양면성" description="무속적 예언보다 기질의 장점과 보완점을 객관적으로 정리합니다." />
+        <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+          <article className="min-w-0 rounded-lg border border-border bg-surface p-4">
+            <p className="text-xs font-black text-sage dark:text-[#c9d4bd]">{reading.dual_reading.weapon.title}</p>
+            <h4 className="mt-3 break-keep font-serif text-2xl font-black leading-tight text-foreground">{reading.dual_reading.weapon.headline}</h4>
+            <p className="mt-4 whitespace-pre-line break-keep text-base font-semibold leading-8 text-stone-600 dark:text-stone-300">{reading.dual_reading.weapon.body}</p>
+          </article>
+          <article className="min-w-0 rounded-lg border border-border bg-surface p-4">
+            <p className="text-xs font-black text-terracotta dark:text-[#d58c6d]">{reading.dual_reading.growth_hint.title}</p>
+            <h4 className="mt-3 break-keep font-serif text-2xl font-black leading-tight text-foreground">{reading.dual_reading.growth_hint.headline}</h4>
+            <p className="mt-4 whitespace-pre-line break-keep text-base font-semibold leading-8 text-stone-600 dark:text-stone-300">{reading.dual_reading.growth_hint.body}</p>
+          </article>
         </div>
       </section>
 
       <section className="min-w-0 rounded-lg border border-border bg-surface p-4 shadow-ritual sm:p-5 dark:shadow-ritual-dark">
-        <SectionHeading index="03" icon={ShieldCheck} label="쓸 수 있는 강점" title={reading.secret_talent.headline} description="고민을 해결할 때 써야 할 타고난 힘을 짚습니다." />
-        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <div className="min-w-0 rounded-lg border border-border bg-surface-muted p-4">
-            <p className="text-xs font-black text-sage dark:text-[#c9d4bd]">{reading.secret_talent.title}</p>
-            <p className="mt-3 whitespace-pre-line break-keep text-base font-bold leading-8 text-stone-700 dark:text-stone-300">{reading.secret_talent.summary}</p>
+        <SectionHeading index="04" icon={Gem} label="모바일 공유용 카드" title="나만의 힐링 오브제" description="용신 오행을 색상, 방향, 짧은 루틴으로 번역한 저장용 카드입니다." />
+        <div className="min-w-0 space-y-4">
+          <HealingCardVisual refNode={summaryCardRef} result={result} name={trimmedName} />
+          <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+            <div className="min-w-0 rounded-lg border border-border bg-surface-muted p-4">
+              <p className="text-xs font-black text-sage dark:text-[#c9d4bd]">카드 해석</p>
+              <p className="mt-3 break-keep text-base font-bold leading-8 text-stone-700 dark:text-stone-300">{reading.healing_card.interpretation}</p>
+            </div>
+            <div className="grid min-w-0 gap-3 sm:grid-cols-3">
+              <div className="min-w-0 rounded-lg border border-border bg-background/70 p-4 dark:bg-[#242321]">
+                <p className="text-xs font-black text-stone-500 dark:text-stone-400">용신</p>
+                <p className="mt-2 break-keep text-lg font-black text-foreground">{reading.healing_card.lucky_element}</p>
+              </div>
+              <div className="min-w-0 rounded-lg border border-border bg-background/70 p-4 dark:bg-[#242321]">
+                <p className="text-xs font-black text-stone-500 dark:text-stone-400">색상</p>
+                <p className="mt-2 break-keep text-lg font-black text-foreground">{reading.healing_card.color}</p>
+              </div>
+              <div className="min-w-0 rounded-lg border border-border bg-background/70 p-4 dark:bg-[#242321]">
+                <p className="text-xs font-black text-stone-500 dark:text-stone-400">방향</p>
+                <p className="mt-2 break-keep text-lg font-black text-foreground">{reading.healing_card.direction}</p>
+              </div>
+            </div>
           </div>
-          <div className="min-w-0 rounded-lg border border-border bg-background/70 p-4 dark:bg-[#242321]">
-            <p className="whitespace-pre-line break-keep text-base font-semibold leading-8 text-stone-600 dark:text-stone-300">{reading.secret_talent.detail}</p>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => exportSummaryCard({ share: false })}
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-sage px-4 text-sm font-black text-white transition hover:bg-[#4c5d50]"
+            >
+              <Download size={17} aria-hidden />
+              카드 PNG 저장
+            </button>
+            <button
+              type="button"
+              onClick={() => exportSummaryCard({ share: true })}
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-terracotta px-4 text-sm font-black text-white transition hover:bg-[#b46d4d]"
+            >
+              <Share2 size={17} aria-hidden />
+              카드 공유
+            </button>
           </div>
+          {exportStatus && <p className="break-keep text-sm font-bold leading-6 text-stone-600 dark:text-stone-300">{exportStatus}</p>}
         </div>
       </section>
 
       <section className="min-w-0 rounded-lg border border-border bg-background/70 p-4 shadow-ritual sm:p-5 dark:bg-[#242321] dark:shadow-ritual-dark">
-        <SectionHeading index="04" icon={Gem} label="공유용 카드" title="핵심 카드와 쉬운 풀이" description="모바일 저장 비율의 카드 옆에 사주 용어를 풀어 설명합니다." />
-        <div className="grid min-w-0 gap-5 md:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)] md:items-start">
-          <SummaryCard refNode={summaryCardRef} name={trimmedName} result={result} />
-          <div className="min-w-0 space-y-4">
-            <ShareCardExplanation result={result} />
-
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => exportSummaryCard({ share: false })}
-                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-sage px-4 text-sm font-black text-white transition hover:bg-[#4c5d50]"
-              >
-                <Download size={17} aria-hidden />
-                PNG 저장
-              </button>
-              <button
-                type="button"
-                onClick={() => exportSummaryCard({ share: true })}
-                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-terracotta px-4 text-sm font-black text-white transition hover:bg-[#b46d4d]"
-              >
-                <Share2 size={17} aria-hidden />
-                공유
-              </button>
-            </div>
-            {exportStatus && <p className="break-keep text-sm font-bold leading-6 text-stone-600 dark:text-stone-300">{exportStatus}</p>}
-          </div>
+        <SectionHeading index="05" icon={MapPinned} label="비밀의 문" title={reading.secret_door.unexplored_area} description="이번 리포트에서 깊게 다루지 않은 다음 흐름입니다." />
+        <div className="min-w-0 rounded-lg border border-border bg-surface p-4">
+          <p className="inline-flex max-w-full items-center gap-2 rounded-lg bg-surface-muted px-3 py-1.5 text-xs font-black text-sage dark:text-[#c9d4bd]">
+            <CalendarClock size={14} aria-hidden />
+            <span className="min-w-0 break-keep">{reading.secret_door.next_month_signal}</span>
+          </p>
+          <p className="mt-4 break-keep font-serif text-xl font-black leading-8 text-foreground">{reading.secret_door.teaser}</p>
         </div>
       </section>
 
@@ -691,7 +757,7 @@ export function ReadingResult({ result, profileName, initialConcern, readingStyl
           <p className="min-w-0 break-keep text-sm font-bold leading-6 text-stone-700 dark:text-stone-300">{reading.caution}</p>
         </div>
         <p className="mt-4 break-keep text-xs font-bold leading-5 text-stone-500 dark:text-stone-400">
-          이 결과는 {trimmedName}님의 입력 정보와 답변을 바탕으로 생성된 참고용 리딩입니다.
+          이 결과는 {trimmedName}님의 입력 정보와 답변을 바탕으로 생성된 참고용 리딩입니다. {dayMasterProfile?.plain}
         </p>
       </section>
 

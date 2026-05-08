@@ -47,6 +47,35 @@ export interface DaewoonPeriod {
   main_element: string;
 }
 
+export interface TimeLuckPillar {
+  label: string;
+  year: number;
+  month: number | null;
+  representative_date: string;
+  pillar: string;
+  stem: string;
+  branch: string;
+  stem_element: string;
+  branch_element: string;
+  stem_yin_yang: "yang" | "yin";
+  branch_yin_yang: "yang" | "yin";
+  stem_ten_god: string;
+  branch_ten_god: string;
+}
+
+export interface CurrentLuck {
+  reference_date: string;
+  annual: TimeLuckPillar;
+  next_month: TimeLuckPillar;
+}
+
+export interface TenGodScore {
+  name: string;
+  score: number;
+  count: number;
+  positions: string[];
+}
+
 export interface SajuData {
   solar_date: string;
   lunar_date: Record<string, unknown>;
@@ -56,7 +85,11 @@ export interface SajuData {
   day_master_element: string;
   elements_count: Record<string, number>;
   ten_gods: Record<string, string>;
+  ten_god_scores: TenGodScore[];
+  dominant_ten_god: TenGodScore;
   daewoon: DaewoonPeriod[];
+  current_luck: CurrentLuck;
+  yonghuishin: YonghuishinAnalysis;
   calculation_note: string;
   raw: Record<string, unknown>;
 }
@@ -102,38 +135,117 @@ export interface GenerateNextQuestionResponse {
   meta: ResponseMeta;
 }
 
-export interface ReadingCareSection {
+export interface CompassSummary {
+  headline: string;
+  basis: string;
+  solution: string;
+  strength_animal: string;
+}
+
+export interface ManseSummary {
+  headline: string;
+  energy_overview: string;
+  key_traits: string[];
+}
+
+export interface YonghuishinCandidate {
+  element: string;
+  score: number | null;
+  reason: string;
+}
+
+export interface GeokgukYongshinCandidate extends YonghuishinCandidate {
+  ten_god: string | null;
+  stem: string | null;
+}
+
+export interface DayMasterStrength {
+  support_score: number;
+  drain_score: number;
+  strength_index: number;
+  label: string;
+  evidence: string[];
+}
+
+export interface GeokgukMonthSource {
+  month_branch: string;
+  selected_hidden_stem: string;
+  ten_god: string;
+  transmitted: boolean;
+}
+
+export interface GeokgukAnalysis {
+  name: string;
+  selected_from_month: GeokgukMonthSource;
+  confidence: number;
+  damage: string[];
+}
+
+export interface SpecialGeokCandidate {
+  name: string;
+  confidence: number;
+  reason: string;
+}
+
+export interface YongshinAnalysis {
+  eokbu_yongshin: YonghuishinCandidate[];
+  geokguk_yongshin: GeokgukYongshinCandidate[];
+  johwu_yongshin: YonghuishinCandidate[];
+  final_yongshin: YonghuishinCandidate[];
+  huishin: YonghuishinCandidate[];
+  gishin: YonghuishinCandidate[];
+}
+
+export interface YonghuishinInterpretation {
+  summary: string;
+  strength_reading: string;
+  geokguk_reading: string;
+  yongshin_reading: string;
+}
+
+export interface YonghuishinAnalysis {
+  element_power: Record<string, number>;
+  strength: DayMasterStrength;
+  geokguk: GeokgukAnalysis;
+  special_geok_candidates: SpecialGeokCandidate[];
+  yongshin: YongshinAnalysis;
+  interpretation: YonghuishinInterpretation;
+}
+
+export interface DualReadingSection {
   title: string;
   headline: string;
-  summary: string;
-  detail: string;
+  body: string;
 }
 
-export interface PeriodGuidanceItem {
-  label: string;
-  saju_feature: string;
-  good: string;
-  caution: string;
+export interface DualReading {
+  weapon: DualReadingSection;
+  growth_hint: DualReadingSection;
 }
 
-export interface ShareCard {
-  core_saju_feature: string;
-  balancing_need: string;
-  daily_element: string;
-  daily_reason: string;
-  strengths: string[];
+export interface HealingCard {
+  metaphor_sentence: string;
+  affirmation: string;
+  lucky_element: string;
+  color: string;
+  direction: string;
+  ritual: string;
+  interpretation: string;
+}
+
+export interface SecretDoor {
+  unexplored_area: string;
+  next_month_signal: string;
+  teaser: string;
 }
 
 export interface FinalReading {
   reading_title: string;
-  core_message: string;
-  desired_answer: string;
-  saju_insight: ReadingCareSection;
-  clear_solution: ReadingCareSection;
-  secret_talent: ReadingCareSection;
-  saju_basis: string[];
-  period_guidance: PeriodGuidanceItem[];
-  share_card: ShareCard;
+  compass_summary: CompassSummary;
+  manse_summary: ManseSummary;
+  dual_reading: DualReading;
+  healing_card: HealingCard;
+  secret_door: SecretDoor;
   caution: string;
 }
 
